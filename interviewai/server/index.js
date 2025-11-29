@@ -74,26 +74,54 @@ app.get('/api/languages', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message || 'Failed to fetch languages' }); }
 });
 
-// Chat
+// Chat with streaming support
 app.post('/api/chat', async (req, res) => {
   try {
-    const { messages, code, output, language } = req.body;
+    const { messages, code, output, language, stream } = req.body;
     if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'Messages array required' });
     if (!process.env.GROQ_API_KEY) return res.status(500).json({ error: 'Groq API key not configured' });
 
     const systemPrompt = `You are an experienced technical interviewer. Current code:\n${code ? code : ''}\nOutput:\n${output ? output : ''}`;
-    const completion = await groq.chat.completions.create({
-      messages: [{ role: 'system', content: systemPrompt }, ...messages],
-      model: 'groq/compound',
-      temperature: 0.7,
-      max_tokens: 1024,
-    });
+    
+    if (stream) {
+      // Set up SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
 
-    res.json({ message: completion.choices[0]?.message?.content || 'No response' });
-  } catch (err) { res.status(500).json({ error: err.message || 'Failed to get AI response' }); }
+      const completion = await groq.chat.completions.create({
+        messages: [{ role: 'system', content: systemPrompt }, ...messages],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.7,
+        max_tokens: 1024,
+        stream: true,
+      });
+
+      for await (const chunk of completion) {
+        const content = chunk.choices[0]?.delta?.content || '';
+        if (content) {
+          res.write(`data: ${JSON.stringify({ content })}\n\n`);
+        }
+      }
+      res.write('data: [DONE]\n\n');
+      res.end();
+    } else {
+      const completion = await groq.chat.completions.create({
+        messages: [{ role: 'system', content: systemPrompt }, ...messages],
+        model: 'llama-3.3-70b-versatile',
+        temperature: 0.7,
+        max_tokens: 1024,
+      });
+      res.json({ message: completion.choices[0]?.message?.content || 'No response' });
+    }
+  } catch (err) { 
+    if (!res.headersSent) {
+      res.status(500).json({ error: err.message || 'Failed to get AI response' }); 
+    }
+  }
 });
 
-// Generate question (random topic & difficulty)
+// Generate question with test cases
 app.post('/api/generate-question', async (req, res) => {
   try {
     const { topic, difficulty } = req.body;
@@ -101,25 +129,47 @@ app.post('/api/generate-question', async (req, res) => {
 
     const prompt = `
 You are a technical interviewer creating a coding problem.
-- Generate only the problem description.
-- Include topic: ${topic || 'general'} and difficulty: ${difficulty || 'medium'}.
-- Optional: sample input/output.
+- Generate a problem description for topic: ${topic || 'general'} and difficulty: ${difficulty || 'medium'}.
+- Include: problem statement, example input/output, and constraints.
 - STRICTLY DO NOT provide the solution, hints, or explanation.
-- Keep it concise and focused.
 - Format as markdown with sections: **Question Title**, **Problem**, **Example**, **Constraints**.
+
+After the problem, provide 3-5 test cases in the following JSON format:
+\`\`\`json
+{
+  "testCases": [
+    {"input": "example input", "expectedOutput": "expected output"},
+    {"input": "edge case input", "expectedOutput": "edge case output"}
+  ]
+}
+\`\`\`
     `.trim();
 
     const completion = await groq.chat.completions.create({
       messages: [
-        { role: 'system', content: 'You are a technical interviewer creating coding problems.' },
+        { role: 'system', content: 'You are a technical interviewer creating coding problems with test cases.' },
         { role: 'user', content: prompt }
       ],
-      model: 'groq/compound',
+      model: 'llama-3.3-70b-versatile',
       temperature: 0.8,
-      max_tokens: 800,
+      max_tokens: 1200,
     });
 
-    res.json({ question: completion.choices[0]?.message?.content || 'Failed to generate question' });
+    const response = completion.choices[0]?.message?.content || 'Failed to generate question';
+    
+    // Try to extract test cases from the response
+    let testCases = [];
+    const jsonMatch = response.match(/```json\s*([\s\S]*?)\s*```/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1]);
+        testCases = parsed.testCases || [];
+      } catch (e) {
+        console.error('Failed to parse test cases:', e);
+      }
+    }
+
+    res.json({ question: response, testCases });
   } catch (err) { 
     res.status(500).json({ error: err.message || 'Failed to generate question' }); 
   }
