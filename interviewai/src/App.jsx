@@ -216,13 +216,13 @@ const handleRunCode = async () => {
       body: JSON.stringify({
         source_code: code,
         language_id: language.id,
-        stdin,
+        stdin: updatedBuffer
       }),
     });
-
-    if (!submitRes.ok) throw new Error("Submission request failed");
-    const { token } = await submitRes.json();
-    if (!token) throw new Error("No token returned from server");
+    const json = await submitRes.json();
+    const token = json.token;
+    if (!token) throw new Error("No token returned from backend");
+    setCliToken(token);
 
     let result = null;
     const maxPolls = 40; // ~20 seconds
@@ -236,6 +236,7 @@ const handleRunCode = async () => {
       }
       await new Promise(r => setTimeout(r, 500));
     }
+    console.log("Submission result:", result);
 
     if (!result) {
       setOutput("Error: Timed out waiting for backend to finish execution.");
@@ -465,39 +466,33 @@ const runCodeWithStdin = async (stdinLine = "") => {
   setCliInputBuffer(updatedBuffer);
 
   try {
-    let token = cliToken;
+    // Always submit fresh code
+    appendLine("Running...");
+    const submitRes = await fetch(`${API_URL}/api/submissions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source_code: code,
+        language_id: language.id,
+        stdin: updatedBuffer,
+      }),
+    });
+    const json = await submitRes.json();
+    const token = json.token;
+    setCliToken(token);
 
-    // First submission
-    if (!token) {
-      // Add "Running..." placeholder if terminal is empty
-      setTerminalLines(prev => (prev.length === 0 ? ["Running..."] : prev));
 
-      const submitRes = await fetch(`${API_URL}/api/submissions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source_code: code,
-          language_id: language.id,
-          stdin: updatedBuffer
-        }),
-      });
-      const json = await submitRes.json();
-      token = json.token;
-      setCliToken(token);
-    }
-
-    // Poll for result
     let result = null;
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 100; i++) { // ~20s timeout at 200ms
       const res = await fetch(`${API_URL}/api/submissions/${token}`);
+      if (!res.ok) continue;          // skip if network error
       const json = await res.json();
       if (json.status?.id >= 3) {
         result = json;
         break;
       }
-      await new Promise((r) => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 200));
     }
-
     if (!result) throw new Error("Timed out waiting for result");
 
     const outputText =
