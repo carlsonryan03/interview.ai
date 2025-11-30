@@ -68,7 +68,7 @@ app.get('/api/submissions/:token', async (req, res) => {
 app.get('/api/languages', async (req, res) => {
   try {
     if (!JUDGE0_URL) return res.status(500).json({ error: 'Judge0 URL not configured' });
-    const langRes = await fetch(`${JUDGE0_URL}/languages`, { headers: buildHeaders() });
+    const langRes = await fetch(`${JUDGE0_URL}/languages/all`, { headers: buildHeaders() });
     if (!langRes.ok) throw new Error('Failed to fetch languages');
     res.json(await langRes.json());
   } catch (err) { res.status(500).json({ error: err.message || 'Failed to fetch languages' }); }

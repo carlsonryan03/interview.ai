@@ -1,307 +1,411 @@
 import { useState, useRef, useEffect } from "react";
 import Editor from "@monaco-editor/react";
 
+
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 
+
 const API_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
+
 
 // Language-specific starter code
 const getStarterCode = (languageName) => {
-  const lower = languageName.toLowerCase();
-  
+ const lower = languageName.toLowerCase();
   if (lower.includes("python")) {
-    return "# Type your code here\n\ndef solution():\n    pass\n";
-  } else if (lower.includes("javascript") || lower.includes("nodejs")) {
-    return "// Type your code here\n\nfunction solution() {\n    \n}\n";
-  } else if (lower.includes("java")) {
-    return "// Type your code here\n\npublic class Main {\n    public static void main(String[] args) {\n        \n    }\n}\n";
-  } else if (lower.includes("c++")) {
-    return "// Type your code here\n\n#include <iostream>\nusing namespace std;\n\nint main() {\n    \n    return 0;\n}\n";
-  } else if (lower.match(/\\bc\\b/) && !lower.includes("objc")) {
-    return "// Type your code here\n\n#include <stdio.h>\n\nint main() {\n    \n    return 0;\n}\n";
-  } else if (lower.includes("c#")) {
-    return "// Type your code here\n\nusing System;\n\nclass Program {\n    static void Main() {\n        \n    }\n}\n";
-  } else {
-    return "// Type your code here\n\n";
-  }
+   return "# Type your code here\n\ndef solution():\n    pass\n";
+ } else if (lower.includes("javascript") || lower.includes("nodejs")) {
+   return "// Type your code here\n\nfunction solution() {\n    \n}\n";
+ } else if (lower.includes("java")) {
+   return "// Type your code here\n\npublic class Main {\n    public static void main(String[] args) {\n        \n    }\n}\n";
+ } else if (lower.includes("c++")) {
+   return "// Type your code here\n\n#include <iostream>\nusing namespace std;\n\nint main() {\n    \n    return 0;\n}\n";
+ } else if (lower.match(/\\bc\\b/) && !lower.includes("objc")) {
+   return "// Type your code here\n\n#include <stdio.h>\n\nint main() {\n    \n    return 0;\n}\n";
+ } else if (lower.includes("c#")) {
+   return "// Type your code here\n\nusing System;\n\nclass Program {\n    static void Main() {\n        \n    }\n}\n";
+ } else {
+   return "// Type your code here\n\n";
+ }
 };
 
+
 function parseMarkdown(text) {
-  if (!text) return "";
-  let html = text;
-  html = html.replace(/^### (.*$)/gim, '<h3 style="font-size: 1.1em; font-weight: bold; margin-top: 12px; margin-bottom: 8px; color: #fff;">$1</h3>');
-  html = html.replace(/^## (.*$)/gim, '<h2 style="font-size: 1.25em; font-weight: bold; margin-top: 12px; margin-bottom: 8px; color: #fff;">$1</h2>');
-  html = html.replace(/^# (.*$)/gim, '<h1 style="font-size: 1.5em; font-weight: bold; margin-top: 12px; margin-bottom: 8px; color: #fff;">$1</h1>');
-  html = html.replace(/\\*\\*(.*?)\\*\\*/g, '<strong style="font-weight: bold; color: #fff;">$1</strong>');
-  html = html.replace(/```(\\w+)?\\n([\\s\\S]*?)```/g, '<pre style="background: #1e1e1e; padding: 12px; border-radius: 4px; margin: 8px 0; overflow-x: auto; border: 1px solid #444;"><code style="color: #4ec9b0; font-size: 13px; font-family: monospace;">$2</code></pre>');
-  html = html.replace(/`([^`]+)`/g, '<code style="background: #1e1e1e; padding: 2px 6px; border-radius: 3px; color: #4ec9b0; font-size: 13px; font-family: monospace;">$1</code>');
-  html = html.replace(/\\n/g, "<br>");
-  return html;
+ if (!text) return "";
+ let html = text;
+ html = html.replace(/^### (.*$)/gim, '<h3 style="font-size: 1.1em; font-weight: bold; margin-top: 12px; margin-bottom: 8px; color: #fff;">$1</h3>');
+ html = html.replace(/^## (.*$)/gim, '<h2 style="font-size: 1.25em; font-weight: bold; margin-top: 12px; margin-bottom: 8px; color: #fff;">$1</h2>');
+ html = html.replace(/^# (.*$)/gim, '<h1 style="font-size: 1.5em; font-weight: bold; margin-top: 12px; margin-bottom: 8px; color: #fff;">$1</h1>');
+ html = html.replace(/\\*\\*(.*?)\\*\\*/g, '<strong style="font-weight: bold; color: #fff;">$1</strong>');
+ html = html.replace(/```(\\w+)?\\n([\\s\\S]*?)```/g, '<pre style="background: #1e1e1e; padding: 12px; border-radius: 4px; margin: 8px 0; overflow-x: auto; border: 1px solid #444;"><code style="color: #4ec9b0; font-size: 13px; font-family: monospace;">$2</code></pre>');
+ html = html.replace(/`([^`]+)`/g, '<code style="background: #1e1e1e; padding: 2px 6px; border-radius: 3px; color: #4ec9b0; font-size: 13px; font-family: monospace;">$1</code>');
+ html = html.replace(/\\n/g, "<br>");
+ return html;
 }
+
 
 function mapToMonaco(name) {
-  const lower = name.toLowerCase();
-  if (lower.includes("python")) return "python";
-  if (lower.includes("javascript") || lower.includes("nodejs")) return "javascript";
-  if (lower.includes("typescript")) return "typescript";
-  if (lower.includes("java")) return "java";
-  if (lower.includes("c++")) return "cpp";
-  if (lower.includes("c#")) return "csharp";
-  if (lower.match(/\\bc\\b/) && !lower.includes("objc")) return "c";
-  if (lower.includes("ruby")) return "ruby";
-  if (lower.includes("php")) return "php";
-  if (lower.includes("go")) return "go";
-  if (lower.includes("swift")) return "swift";
-  if (lower.includes("kotlin")) return "kotlin";
-  if (lower.includes("r ") || lower === "r") return "r";
-  if (lower.includes("rust")) return "rust";
-  if (lower.includes("sql")) return "sql";
-  if (lower.includes("bash") || lower.includes("shell")) return "shell";
-  return "plaintext";
+ const lower = name.toLowerCase();
+ if (lower.includes("python")) return "python";
+ if (lower.includes("javascript") || lower.includes("nodejs")) return "javascript";
+ if (lower.includes("typescript")) return "typescript";
+ if (lower.includes("java")) return "java";
+ if (lower.includes("c++")) return "cpp";
+ if (lower.includes("c#")) return "csharp";
+ if (lower.match(/\\bc\\b/) && !lower.includes("objc")) return "c";
+ if (lower.includes("ruby")) return "ruby";
+ if (lower.includes("php")) return "php";
+ if (lower.includes("go")) return "go";
+ if (lower.includes("swift")) return "swift";
+ if (lower.includes("kotlin")) return "kotlin";
+ if (lower.includes("r ") || lower === "r") return "r";
+ if (lower.includes("rust")) return "rust";
+ if (lower.includes("sql")) return "sql";
+ if (lower.includes("bash") || lower.includes("shell")) return "shell";
+ return "plaintext";
 }
 
+
 function formatTime(seconds) {
-  const mins = Math.floor(seconds / 60);
-  const secs = seconds % 60;
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
+ const mins = Math.floor(seconds / 60);
+ const secs = seconds % 60;
+ return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Base64 helpers (Unicode-safe)
+function encodeBase64Safe(str) {
+  return btoa(unescape(encodeURIComponent(str)));
+}
+
+function decodeBase64Safe(str) {
+  try {
+    return decodeURIComponent(escape(atob(str)));
+  } catch {
+    return str || "";
+  }
 }
 
 export default function App() {
-  const [languages, setLanguages] = useState([]);
-  const [language, setLanguage] = useState(null);
-  const [code, setCode] = useState("// Type your code here\n");
-  const [output, setOutput] = useState("");
-  const [running, setRunning] = useState(false);
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [sending, setSending] = useState(false);
-  const [questionData, setQuestionData] = useState(null);
-  const [loadingQuestion, setLoadingQuestion] = useState(false);
-  const [topic, setTopic] = useState("");
-  const [difficulty, setDifficulty] = useState("medium");
-  const [testResults, setTestResults] = useState([]);
-  const [runningTests, setRunningTests] = useState(false);
-  const [timer, setTimer] = useState(0);
-  const [timerActive, setTimerActive] = useState(false);
-  const [showCLI, setShowCLI] = useState(false);
-  const [cliInput, setCliInput] = useState("");
-  const chatEndRef = useRef(null);
-  const streamingMessageRef = useRef("");
+ const [languages, setLanguages] = useState([]);
+ const [language, setLanguage] = useState(null);
+ const [code, setCode] = useState("// Type your code here\n");
+ const [output, setOutput] = useState("");
+ const [running, setRunning] = useState(false);
+ const [messages, setMessages] = useState([]);
+ const [input, setInput] = useState("");
+ const [sending, setSending] = useState(false);
+ const [questionData, setQuestionData] = useState(null);
+ const [loadingQuestion, setLoadingQuestion] = useState(false);
+ const [topic, setTopic] = useState("");
+ const [difficulty, setDifficulty] = useState("medium");
+ const [testResults, setTestResults] = useState([]);
+ const [runningTests, setRunningTests] = useState(false);
+ const [timer, setTimer] = useState(0);
+ const [timerActive, setTimerActive] = useState(false);
+ const [showCLI, setShowCLI] = useState(false);
+ const [cliInput, setCliInput] = useState("");
+ const chatEndRef = useRef(null);
+ const streamingMessageRef = useRef("");
 
-  const scrollToBottom = () => chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  useEffect(() => scrollToBottom(), [messages]);
 
-  // Timer effect
-  useEffect(() => {
-    let interval;
-    if (timerActive) {
-      interval = setInterval(() => {
-        setTimer(prev => prev + 1);
-      }, 1000);
+ const scrollToBottom = () => chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+ useEffect(() => scrollToBottom(), [messages]);
+
+
+ // Timer effect
+ useEffect(() => {
+   let interval;
+   if (timerActive) {
+     interval = setInterval(() => {
+       setTimer(prev => prev + 1);
+     }, 1000);
+   }
+   return () => clearInterval(interval);
+ }, [timerActive]);
+
+
+ useEffect(() => {
+   async function loadLanguages() {
+     try {
+       const res = await fetch(`${API_URL}/api/languages`);
+       if (!res.ok) throw new Error("Failed to fetch languages");
+       const langs = await res.json();
+
+
+       // Filter out archived safely
+       const activeLangs = Array.isArray(langs) ? langs.filter(l => !l.archived) : [];
+
+
+       const mapped = activeLangs
+         .map((l) => ({
+           id: l.id,
+           name: l.name,
+           monaco: mapToMonaco(l.name),
+         }))
+         .sort((a, b) => a.name.localeCompare(b.name));
+
+
+       setLanguages(mapped);
+
+
+       // Pick first Python language or fallback to first language (if exists)
+       const defaultLang =
+         mapped.find((l) => l.name.toLowerCase().includes("python")) ||
+         mapped[0] ||
+         null;
+
+
+       if (defaultLang) {
+         setLanguage(defaultLang);
+         setCode(getStarterCode(defaultLang.name || ""));
+       } else {
+         // no languages returned — set sane defaults
+         setLanguage(null);
+         setCode("// Type your code here\n");
+         console.warn("No languages returned from API");
+       }
+     } catch (err) {
+       console.error("Error loading languages:", err);
+     }
+   }
+   loadLanguages();
+ }, []);
+
+
+
+
+
+
+ // existing handleLanguageChange that accepts object stays:
+ const handleLanguageChange = (newLanguage) => {
+   if (!newLanguage) return;
+   setLanguage(newLanguage);
+   setCode(getStarterCode(newLanguage.name || ""));
+ };
+
+
+ // helper that accepts an id (used by the <select>)
+ const handleLanguageChangeById = (id) => {
+   const selected = languages.find(l => l.id === Number(id));
+   if (selected) handleLanguageChange(selected);
+   else console.warn("Selected language id not found:", id);
+ };
+
+
+
+
+const handleRunCode = async () => {
+  if (!language) return;
+
+  if (showCLI) {
+    setTerminalLines(["Running..."]);
+    runCodeWithStdin(""); // submit code with empty stdin initially
+    return;
+  }
+
+  setRunning(true);
+  setOutput("Running...");
+
+  const stdin = "";
+
+  try {
+    const submitRes = await fetch(`${API_URL}/api/submissions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source_code: code,
+        language_id: language.id,
+        stdin,
+      }),
+    });
+
+    if (!submitRes.ok) throw new Error("Submission request failed");
+    const { token } = await submitRes.json();
+    if (!token) throw new Error("No token returned from server");
+
+    let result = null;
+    const maxPolls = 40; // ~20 seconds
+    for (let i = 0; i < maxPolls; i++) {
+      const res = await fetch(`${API_URL}/api/submissions/${token}`);
+      if (!res.ok) continue;
+      const json = await res.json();
+      if (json.status?.id >= 3) {
+        result = json;
+        break;
+      }
+      await new Promise(r => setTimeout(r, 500));
     }
-    return () => clearInterval(interval);
-  }, [timerActive]);
 
-  useEffect(() => {
-    async function loadLanguages() {
-      try {
-        const res = await fetch(`${API_URL}/api/languages`);
-        if (!res.ok) throw new Error("Failed to fetch languages");
-        const langs = await res.json();
-
-        // Only use non-archived languages
-        const activeLangs = langs.filter(l => !l.archived);
-
-        const mapped = activeLangs
-          .map((l) => ({
-            id: l.id,
-            name: l.name,
-            monaco: mapToMonaco(l.name),
-          }))
-          .sort((a, b) => a.name.localeCompare(b.name));
-
-        setLanguages(mapped);
-
-        // Pick first Python language or fallback to first language
-        const defaultLang =
-          mapped.find((l) => l.name.toLowerCase().includes("python")) ||
-          mapped[0];
-
-        setLanguage(defaultLang);
-        setCode(getStarterCode(defaultLang.name));
-      } catch (err) {
-        console.error("Error loading languages:", err);
-      }
-    }
-    loadLanguages();
-  }, []);
-
-
-  const handleLanguageChange = (newLanguage) => {
-    setLanguage(newLanguage);
-    setCode(getStarterCode(newLanguage.name));
-  };
-
-  const handleRunCode = async () => {
-    if (!language) return;
-
-    setRunning(true);
-
-    if (showCLI) {
-      // Clear previous terminal lines and show placeholder
-      setTerminalLines(["Running..."]);
-    } else {
-      setOutput("Running...");
-    }
-
-    // Encode stdin for Judge0 API
-    const stdin = showCLI ? btoa(cliInput) : "";
-
-    try {
-      const submitRes = await fetch(`${API_URL}/api/submissions`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source_code: code,
-          language_id: language.id,
-          stdin: stdin,
-        }),
-      });
-
-      if (!submitRes.ok) {
-        const errorData = await submitRes.json();
-        throw new Error(errorData.error || submitRes.statusText);
-      }
-
-      const { token } = await submitRes.json();
-      if (!token) throw new Error("No token returned from server");
-
-      // Poll for result
-      let result = null;
-      for (let i = 0; i < 40; i++) {
-        const res = await fetch(`${API_URL}/api/submissions/${token}`);
-        const json = await res.json();
-        if (json.status && json.status.id >= 3) {
-          result = json;
-          break;
-        }
-        await new Promise((r) => setTimeout(r, 500));
-      }
-
-      if (!result) throw new Error("Timed out waiting for result");
-
-      const safeDecode = (str) => {
-        if (!str) return "";
-        try {
-          return atob(str);
-        } catch {
-          return str;
-        }
-      };
-
-      const outputText =
-        safeDecode(result.stdout) ||
-        safeDecode(result.compile_output) ||
-        safeDecode(result.stderr) ||
-        result.message ||
-        "No output";
-
-      if (showCLI) {
-        // Replace "Running..." with actual output
-        setTerminalLines(outputText.split("\n"));
-      } else {
-        setOutput(outputText);
-      }
-    } catch (err) {
-      if (showCLI) {
-        setTerminalLines([`Error: ${err?.message || String(err)}`]);
-      } else {
-        setOutput("Error: " + (err?.message || String(err)));
-      }
-    } finally {
-      setRunning(false);
-    }
-  };
-
-
-
-
-
-  const runTestCases = async () => {
-    if (!questionData?.testCases || questionData.testCases.length === 0) {
-      alert("No test cases available");
+    if (!result) {
+      setOutput("Error: Timed out waiting for backend to finish execution.");
       return;
     }
 
-    setRunningTests(true);
-    setTestResults([]);
+    const outputText =
+      decodeBase64Safe(result.stdout) ||
+      decodeBase64Safe(result.compile_output) ||
+      decodeBase64Safe(result.stderr) ||
+      result.message ||
+      "No output";
 
-    try {
-      const res = await fetch(`${API_URL}/api/run-tests`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source_code: code,
-          language_id: language.id,
-          testCases: questionData.testCases,
-        }),
-      });
-
-      const data = await res.json();
-      setTestResults(data.results || []);
-    } catch (err) {
-      alert("Error running tests: " + err.message);
-    } finally {
-      setRunningTests(false);
-    }
-  };
-
-  const generateQuestion = async () => {
-  setLoadingQuestion(true);
-  setTimer(0);
-  setTimerActive(false);
-  setTestResults([]);
-
-  try {
-    const res = await fetch(`${API_URL}/api/generate-question`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic, difficulty }),
-    });
-
-    const data = await res.json();
-    setQuestionData(data);
-
-    // Take the backend 'question' field directly
-    const questionText = data.question || "Coding Challenge";
-
-    setMessages([{ role: "assistant", content: questionText }]);
-    setTimerActive(true);
+    setOutput(outputText);
   } catch (err) {
-    alert("Error generating question: " + err.message);
+    setOutput("Error: " + (err.message || String(err)));
   } finally {
-    setLoadingQuestion(false);
+    setRunning(false);
   }
 };
 
 
-  const sendMessage = async (customMessage = null) => {
-    const msg = customMessage || input.trim();
-    if (!msg && !customMessage) return;
 
-    const userMessage = { role: "user", content: msg };
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
-    setInput("");
-    setSending(true);
-    streamingMessageRef.current = "";
+ const runTestCases = async () => {
+   if (!questionData?.testCases || questionData.testCases.length === 0) {
+     alert("No test cases available");
+     return;
+   }
 
-    // Add placeholder for streaming message
-    setMessages([...newMessages, { role: "assistant", content: "", streaming: true }]);
 
+   setRunningTests(true);
+   setTestResults([]);
+
+
+   try {
+     const res = await fetch(`${API_URL}/api/run-tests`, {
+       method: "POST",
+       headers: { "Content-Type": "application/json" },
+       body: JSON.stringify({
+         source_code: code,
+         language_id: language.id,
+         testCases: questionData.testCases,
+       }),
+     });
+
+
+     const data = await res.json();
+     setTestResults(data.results || []);
+   } catch (err) {
+     alert("Error running tests: " + err.message);
+   } finally {
+     setRunningTests(false);
+   }
+ };
+
+
+ const generateQuestion = async () => {
+ setLoadingQuestion(true);
+ setTimer(0);
+ setTimerActive(false);
+ setTestResults([]);
+
+
+ try {
+   const res = await fetch(`${API_URL}/api/generate-question`, {
+     method: "POST",
+     headers: { "Content-Type": "application/json" },
+     body: JSON.stringify({ topic, difficulty }),
+   });
+
+
+   const data = await res.json();
+   setQuestionData(data);
+
+
+   // Take the backend 'question' field directly
+   const questionText = data.question || "Coding Challenge";
+
+
+   setMessages([{ role: "assistant", content: questionText }]);
+   setTimerActive(true);
+ } catch (err) {
+   alert("Error generating question: " + err.message);
+ } finally {
+   setLoadingQuestion(false);
+ }
+};
+
+ const sendMessage = async (customMessage = null) => {
+  const msg = customMessage || input.trim();
+  if (!msg && !customMessage) return;
+
+  const userMessage = { role: "user", content: msg };
+  const newMessages = [...messages, userMessage];
+  setMessages(newMessages);
+  setInput("");
+  setSending(true);
+  streamingMessageRef.current = "";
+
+  // Add placeholder for streaming message
+  setMessages(prev => [...prev, { role: "assistant", content: "", streaming: true }]);
+
+  try {
+    const res = await fetch(`${API_URL}/api/chat/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: newMessages,
+        code,
+        output,
+        language: language?.name,
+      }),
+    });
+
+    if (!res.body) throw new Error("No response body from server");
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let done = false;
+    let pollCount = 0;
+    const maxPolls = 300; // ~30s timeout
+
+    while (!done && pollCount < maxPolls) {
+      const { value, done: readerDone } = await reader.read();
+      done = readerDone;
+      pollCount++;
+
+      if (value) {
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n");
+
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const data = line.slice(6);
+            if (data === "[DONE]") {
+              done = true;
+              break;
+            }
+            try {
+              const parsed = JSON.parse(data);
+              if (parsed.content) {
+                streamingMessageRef.current += parsed.content;
+                setMessages(prev => [
+                  ...prev.slice(0, -1),
+                  {
+                    role: "assistant",
+                    content: streamingMessageRef.current,
+                    streaming: true,
+                  },
+                ]);
+              }
+            } catch (e) {
+              console.warn("Failed to parse chunk:", e);
+            }
+          }
+        }
+      }
+    }
+
+    // Finalize message
+    setMessages(prev => [
+      ...prev.slice(0, -1),
+      {
+        role: "assistant",
+        content: streamingMessageRef.current,
+      },
+    ]);
+  } catch (err) {
+    console.error("Streaming failed, fallback:", err);
     try {
-      const res = await fetch(`${API_URL}/api/chat/stream`, {
+      const fallback = await fetch(`${API_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -311,599 +415,590 @@ export default function App() {
           language: language?.name,
         }),
       });
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') {
-              break;
-            }
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.content) {
-                streamingMessageRef.current += parsed.content;
-                setMessages([...newMessages, { 
-                  role: "assistant", 
-                  content: streamingMessageRef.current,
-                  streaming: true 
-                }]);
-              }
-            } catch (e) {
-              // Ignore parse errors
-            }
-          }
-        }
-      }
-
-      // Finalize message
-      setMessages([...newMessages, { 
-        role: "assistant", 
-        content: streamingMessageRef.current 
-      }]);
-    } catch (err) {
-      // Fallback to regular chat
-      try {
-        const res = await fetch(`${API_URL}/api/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            messages: newMessages,
-            code,
-            output,
-            language: language?.name,
-          }),
-        });
-        const data = await res.json();
-        setMessages([...newMessages, { role: "assistant", content: data.message }]);
-      } catch (fallbackErr) {
-        alert("Error: " + fallbackErr.message);
-        setMessages(newMessages);
-      }
-    } finally {
-      setSending(false);
+      const data = await fallback.json();
+      setMessages(prev => [...prev, { role: "assistant", content: data.message }]);
+    } catch (fallbackErr) {
+      alert("Error: " + fallbackErr.message);
+      setMessages(newMessages);
     }
-  };
+  } finally {
+    setSending(false);
+  }
+};
 
-  const askForHint = () => sendMessage("Can you give me a hint for this problem?");
-  const submitForReview = () =>
-    sendMessage("Please review my solution and let me know if it's correct and efficient.");
 
-  const passedTests = testResults.filter(r => r.passed).length;
-  const totalTests = testResults.length;
 
-  const [terminalLines, setTerminalLines] = useState([]);
-  const terminalRef = useRef(null);
+ const askForHint = () => sendMessage("Can you give me a hint for this problem?");
+ const submitForReview = () =>
+   sendMessage("Please review my solution and let me know if it's correct and efficient.");
 
-  // Auto-scroll terminal
-  useEffect(() => {
-    terminalRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [terminalLines]);
 
-  const appendLine = (text) => setTerminalLines((lines) => [...lines, text]);
+ const passedTests = testResults.filter(r => r.passed).length;
+ const totalTests = testResults.length;
 
-  const handleCliKeyPress = (e) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      const inputLine = cliInput.trim();
-      if (!inputLine) return;
-      setCliInput("");
-      appendLine(`> ${inputLine}`);
-      runCodeWithStdin(inputLine);
-    }
-  };
 
-  const runCodeWithStdin = async (stdinLine) => {
+ const [terminalLines, setTerminalLines] = useState([]);
+ const terminalRef = useRef(null);
+
+
+ // Auto-scroll terminal
+ useEffect(() => {
+   terminalRef.current?.scrollIntoView({ behavior: "smooth" });
+ }, [terminalLines]);
+
+
+ const appendLine = (text) => setTerminalLines((lines) => [...lines, text]);
+
+ const [cliInputBuffer, setCliInputBuffer] = useState(""); // stores stdin lines
+const [cliToken, setCliToken] = useState(null);           // stores the current submission token
+
+const runCodeWithStdin = async (stdinLine = "") => {
   if (!language) return;
   setRunning(true);
 
-  try {
-    const submitRes = await fetch(`${API_URL}/api/submissions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        source_code: code,
-        language_id: language.id,
-        stdin: btoa(stdinLine + "\n"),
-      }),
-    });
+  let updatedBuffer = cliInputBuffer;
+  if (stdinLine) updatedBuffer += stdinLine + "\n";
+  setCliInputBuffer(updatedBuffer);
 
-    const { token } = await submitRes.json();
+  try {
+    let token = cliToken;
+
+    // First submission
+    if (!token) {
+      const submitRes = await fetch(`${API_URL}/api/submissions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_code: code,
+          language_id: language.id,
+          stdin: encodeBase64Safe(updatedBuffer),
+        }),
+      });
+      const json = await submitRes.json();
+      token = json.token;
+      setCliToken(token);
+    }
+
+    // Poll for result
     let result = null;
     for (let i = 0; i < 40; i++) {
       const res = await fetch(`${API_URL}/api/submissions/${token}`);
       const json = await res.json();
-      if (json.status && json.status.id >= 3) {
+      if (json.status?.id >= 3) {
         result = json;
         break;
       }
-      await new Promise((r) => setTimeout(r, 500));
+      await new Promise((r) => setTimeout(r, 200));
     }
 
-    const decode = (str) => (str ? atob(str) : "");
-    let outputText =
-      decode(result.stdout) || decode(result.compile_output) || decode(result.stderr) || result.message || "";
+    if (!result) throw new Error("Timed out waiting for result");
 
-    // Remove repeated prompt if it matches the stdin line
-    if (showCLI && outputText.endsWith(stdinLine + "\n")) {
-      outputText = outputText.slice(0, -stdinLine.length - 1);
-    }
+    const outputText =
+      decodeBase64Safe(result.stdout) ||
+      decodeBase64Safe(result.compile_output) ||
+      decodeBase64Safe(result.stderr) ||
+      result.message ||
+      "";
 
-    appendLine(outputText);
+    if (stdinLine) appendLine(`> ${stdinLine}`);
+    if (outputText) appendLine(outputText);
+
+    // Reset CLI state if finished
+    setCliInputBuffer("");
+    setCliToken(null);
   } catch (err) {
     appendLine("Error: " + (err.message || String(err)));
+    setCliToken(null);
   } finally {
     setRunning(false);
   }
 };
 
+const handleCliKeyPress = (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    const inputLine = cliInput.trim();
+    if (!inputLine && !cliInputBuffer) return; // ignore empty
+    setCliInput("");
+    runCodeWithStdin(inputLine);
+  }
+};
 
-  return (
-    <div
-      style={{
-        height: "100vh",
-        width: "100vw",
-        display: "flex",
-        flexDirection: "column",
-        background: "#1e1e1e",
-        overflow: "hidden",
-      }}
-    >
-      {/* Header */}
-      <header
-        style={{
-          padding: "15px 20px",
-          background: "#252526",
-          color: "white",
-          borderBottom: "1px solid #3e3e42",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <h2 style={{ margin: 0 }}>💻 AI Coding Interview</h2>
-        {timerActive && (
-          <div
-            style={{
-              fontSize: "24px",
-              fontWeight: "bold",
-              color: timer > 1800 ? "#ff6b6b" : "#4CAF50",
-            }}
-          >
-            ⏱️ {formatTime(timer)}
-          </div>
-        )}
-      </header>
 
-      <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
-        {/* Left Panel */}
-        <div
-          style={{
-            width: "35%",
-            minWidth: "300px",
-            maxWidth: "500px",
-            display: "flex",
-            flexDirection: "column",
-            borderRight: "1px solid #3e3e42",
-            background: "#252526",
-            overflow: "hidden",
-          }}
-        >
-          {/* Topic/Difficulty & Generate Question */}
-          <div style={{ padding: "15px", borderBottom: "1px solid #3e3e42" }}>
-            <div style={{ marginBottom: "10px", display: "flex", gap: "10px" }}>
-              <input
-                type="text"
-                placeholder="Topic (e.g., arrays, strings)"
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                style={{
-                  flex: 1,
-                  padding: "8px",
-                  background: "#3c3c3c",
-                  color: "white",
-                  border: "1px solid #555",
-                  borderRadius: "4px",
-                }}
-              />
-              <select
-                value={difficulty}
-                onChange={(e) => setDifficulty(e.target.value)}
-                style={{
-                  padding: "8px",
-                  background: "#3c3c3c",
-                  color: "white",
-                  border: "1px solid #555",
-                  borderRadius: "4px",
-                }}
-              >
-                <option value="easy">Easy</option>
-                <option value="medium">Medium</option>
-                <option value="hard">Hard</option>
-              </select>
-            </div>
+ return (
+   <div
+     style={{
+       height: "100vh",
+       width: "100vw",
+       display: "flex",
+       flexDirection: "column",
+       background: "#1e1e1e",
+       overflow: "hidden",
+     }}
+   >
+     {/* Header */}
+     <header
+       style={{
+         padding: "15px 20px",
+         background: "#252526",
+         color: "white",
+         borderBottom: "1px solid #3e3e42",
+         display: "flex",
+         justifyContent: "space-between",
+         alignItems: "center",
+       }}
+     >
+       <h2 style={{ margin: 0 }}>💻 AI Coding Interview</h2>
+       {timerActive && (
+         <div
+           style={{
+             fontSize: "24px",
+             fontWeight: "bold",
+             color: timer > 1800 ? "#ff6b6b" : "#4CAF50",
+           }}
+         >
+           ⏱️ {formatTime(timer)}
+         </div>
+       )}
+     </header>
 
-            <button
-              onClick={generateQuestion}
-              disabled={loadingQuestion}
-              style={{
-                padding: "10px 20px",
-                background: "#007acc",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: loadingQuestion ? "not-allowed" : "pointer",
-                width: "100%",
-              }}
-            >
-              {loadingQuestion ? "Generating..." : "🎲 Generate New Question"}
-            </button>
-          </div>
 
-          {/* Chat */}
-          <div style={{ flex: 1, overflowY: "auto", padding: "15px" }}>
-            {messages.length === 0 && (
-              <p
-                style={{
-                  color: "#888",
-                  textAlign: "center",
-                  marginTop: "20px",
-                }}
-              >
-                Generate a question to start
-              </p>
-            )}
-            {messages.map((msg, i) => (
-              <div
-                key={i}
-                style={{
-                  marginBottom: "15px",
-                  padding: "12px",
-                  borderRadius: "8px",
-                  background: msg.role === "user" ? "#094771" : "#2d2d30",
-                  color: "white",
-                }}
-              >
-                <div
-                  style={{
-                    fontWeight: "bold",
-                    marginBottom: "8px",
-                    fontSize: "11px",
-                    color: "#888",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {msg.role === "user" ? "You" : "AI Interviewer"}{" "}
-                  {msg.streaming && "▋"}
-                </div>
-                <div style={{ fontSize: "14px", lineHeight: "1.6" }}>
-                  <ReactMarkdown rehypePlugins={[rehypeRaw]}>
-                    {msg.content}
-                  </ReactMarkdown>
-                </div>
-              </div>
-            ))}
-            <div ref={chatEndRef} />
-          </div>
+     <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
+       {/* Left Panel */}
+       <div
+         style={{
+           width: "35%",
+           minWidth: "300px",
+           maxWidth: "500px",
+           display: "flex",
+           flexDirection: "column",
+           borderRight: "1px solid #3e3e42",
+           background: "#252526",
+           overflow: "hidden",
+         }}
+       >
+         {/* Topic/Difficulty & Generate Question */}
+         <div style={{ padding: "15px", borderBottom: "1px solid #3e3e42" }}>
+           <div style={{ marginBottom: "10px", display: "flex", gap: "10px" }}>
+             <input
+               type="text"
+               placeholder="Topic (e.g., arrays, strings)"
+               value={topic}
+               onChange={(e) => setTopic(e.target.value)}
+               style={{
+                 flex: 1,
+                 padding: "8px",
+                 background: "#3c3c3c",
+                 color: "white",
+                 border: "1px solid #555",
+                 borderRadius: "4px",
+               }}
+             />
+             <select
+               value={difficulty}
+               onChange={(e) => setDifficulty(e.target.value)}
+               style={{
+                 padding: "8px",
+                 background: "#3c3c3c",
+                 color: "white",
+                 border: "1px solid #555",
+                 borderRadius: "4px",
+               }}
+             >
+               <option value="easy">Easy</option>
+               <option value="medium">Medium</option>
+               <option value="hard">Hard</option>
+             </select>
+           </div>
 
-          {/* Hint/Review Buttons */}
-          {messages.length > 0 && (
-            <div
-              style={{
-                padding: "10px",
-                borderTop: "1px solid #3e3e42",
-                display: "flex",
-                gap: "8px",
-              }}
-            >
-              <button
-                onClick={askForHint}
-                disabled={sending}
-                style={{
-                  flex: 1,
-                  padding: "8px",
-                  background: "#3a3a3c",
-                  color: "white",
-                  border: "1px solid #555",
-                  borderRadius: "4px",
-                  cursor: sending ? "not-allowed" : "pointer",
-                  fontSize: "12px",
-                }}
-              >
-                💡 Hint
-              </button>
-              <button
-                onClick={submitForReview}
-                disabled={sending}
-                style={{
-                  flex: 1,
-                  padding: "8px",
-                  background: "#3a3a3c",
-                  color: "white",
-                  border: "1px solid #555",
-                  borderRadius: "4px",
-                  cursor: sending ? "not-allowed" : "pointer",
-                  fontSize: "12px",
-                }}
-              >
-                ✓ Review
-              </button>
-            </div>
-          )}
 
-          {/* Input Box */}
-          <div
-            style={{
-              padding: "10px",
-              borderTop: "1px solid #3e3e42",
-            }}
-          >
-            <div style={{ display: "flex", gap: "8px" }}>
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && sendMessage()}
-                placeholder="Ask a question..."
-                disabled={sending}
-                style={{
-                  flex: 1,
-                  padding: "10px",
-                  background: "#3c3c3c",
-                  border: "1px solid #555",
-                  borderRadius: "4px",
-                  color: "white",
-                  fontSize: "14px",
-                }}
-              />
-              <button
-                onClick={() => sendMessage()}
-                disabled={sending || !input.trim()}
-                style={{
-                  padding: "10px 20px",
-                  background:
-                    sending || !input.trim() ? "#555" : "#007acc",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor:
-                    sending || !input.trim() ? "not-allowed" : "pointer",
-                }}
-              >
-                Send
-              </button>
-            </div>
-          </div>
-        </div>
+           <button
+             onClick={generateQuestion}
+             disabled={loadingQuestion}
+             style={{
+               padding: "10px 20px",
+               background: "#007acc",
+               color: "white",
+               border: "none",
+               borderRadius: "4px",
+               cursor: loadingQuestion ? "not-allowed" : "pointer",
+               width: "100%",
+             }}
+           >
+             {loadingQuestion ? "Generating..." : "🎲 Generate New Question"}
+           </button>
+         </div>
 
-        {/* Right Panel */}
-        <div
-          style={{
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
-          {/* Top toolbar */}
-          <div
-            style={{
-              padding: "10px",
-              background: "#252526",
-              borderBottom: "1px solid #3e3e42",
-              display: "flex",
-              gap: "10px",
-              alignItems: "center",
-            }}
-          >
-            <label
-              style={{
-                color: "white",
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-              }}
-            >
-              Language:
-              <select
-                value={language?.id || ""}
-                onChange={(e) => {
-                  const newLang = languages.find(
-                    (l) => l.id === Number(e.target.value)
-                  );
-                  if (newLang) handleLanguageChange(newLang);
-                }}
-                style={{
-                  padding: "8px",
-                  background: "#3c3c3c",
-                  color: "white",
-                  border: "1px solid #555",
-                  borderRadius: "4px",
-                  minWidth: "180px",
-                }}
-              >
-                {languages.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
-                  </option>
-                ))}
-              </select>
-            </label>
 
-            <button
-              onClick={() => setShowCLI(!showCLI)}
-              style={{
-                padding: "8px 16px",
-                background: showCLI ? "#007acc" : "#3a3a3c",
-                color: "white",
-                border: "1px solid #555",
-                borderRadius: "4px",
-                cursor: "pointer",
-              }}
-            >
-              {showCLI ? "📟 CLI On" : "📟 CLI Off"}
-            </button>
+         {/* Chat */}
+         <div style={{ flex: 1, overflowY: "auto", padding: "15px" }}>
+           {messages.length === 0 && (
+             <p
+               style={{
+                 color: "#888",
+                 textAlign: "center",
+                 marginTop: "20px",
+               }}
+             >
+               Generate a question to start
+             </p>
+           )}
+           {messages.map((msg, i) => (
+             <div
+               key={i}
+               style={{
+                 marginBottom: "15px",
+                 padding: "12px",
+                 borderRadius: "8px",
+                 background: msg.role === "user" ? "#094771" : "#2d2d30",
+                 color: "white",
+               }}
+             >
+               <div
+                 style={{
+                   fontWeight: "bold",
+                   marginBottom: "8px",
+                   fontSize: "11px",
+                   color: "#888",
+                   textTransform: "uppercase",
+                 }}
+               >
+                 {msg.role === "user" ? "You" : "AI Interviewer"}{" "}
+                 {msg.streaming && "▋"}
+               </div>
+               <div style={{ fontSize: "14px", lineHeight: "1.6" }}>
+                 <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                   {msg.content}
+                 </ReactMarkdown>
+               </div>
+             </div>
+           ))}
+           <div ref={chatEndRef} />
+         </div>
 
-            {questionData?.testCases && questionData.testCases.length > 0 && (
-              <button
-                onClick={runTestCases}
-                disabled={runningTests}
-                style={{
-                  padding: "8px 16px",
-                  background: runningTests ? "#555" : "#ff9800",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "4px",
-                  cursor: runningTests ? "not-allowed" : "pointer",
-                }}
-              >
-                {runningTests ? "Testing..." : `🧪 Run Tests (${totalTests})`}
-              </button>
-            )}
 
-            <button
-              onClick={handleRunCode}
-              disabled={running || !language}
-              style={{
-                padding: "8px 20px",
-                background: running ? "#555" : "#4CAF50",
-                color: "white",
-                border: "none",
-                borderRadius: "4px",
-                cursor: running ? "not-allowed" : "pointer",
-                marginLeft: "auto",
-              }}
-            >
-              {running ? "Running..." : "▶ Run Code"}
-            </button>
-          </div>
+         {/* Hint/Review Buttons */}
+         {messages.length > 0 && (
+           <div
+             style={{
+               padding: "10px",
+               borderTop: "1px solid #3e3e42",
+               display: "flex",
+               gap: "8px",
+             }}
+           >
+             <button
+               onClick={askForHint}
+               disabled={sending}
+               style={{
+                 flex: 1,
+                 padding: "8px",
+                 background: "#3a3a3c",
+                 color: "white",
+                 border: "1px solid #555",
+                 borderRadius: "4px",
+                 cursor: sending ? "not-allowed" : "pointer",
+                 fontSize: "12px",
+               }}
+             >
+               💡 Hint
+             </button>
+             <button
+               onClick={submitForReview}
+               disabled={sending}
+               style={{
+                 flex: 1,
+                 padding: "8px",
+                 background: "#3a3a3c",
+                 color: "white",
+                 border: "1px solid #555",
+                 borderRadius: "4px",
+                 cursor: sending ? "not-allowed" : "pointer",
+                 fontSize: "12px",
+               }}
+             >
+               ✓ Review
+             </button>
+           </div>
+         )}
 
-          {/* Main content: Editor + CLI + Output */}
-          <div
-            style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
-          >
-            {/* Editor */}
-            <div style={{ flex: 1, overflow: "hidden" }}>
-              <Editor
-                height="100%"
-                language={language?.monaco || "plaintext"}
-                theme="vs-dark"
-                value={code}
-                onChange={(value) => setCode(value || "")}
-                options={{ fontSize: 14, minimap: { enabled: false }, wordWrap: "on" }}
-              />
-            </div>
 
-            {/* Terminal vs Output */}
-            {showCLI ? (
-              <div
-                style={{
-                  flex: 1,
-                  display: "flex",
-                  flexDirection: "column",
-                  borderTop: "1px solid #3e3e42",
-                  background: "#1e1e1e",
-                }}
-              >
-                <div
-                  style={{
-                    padding: "10px",
-                    fontWeight: "bold",
-                    color: "#fff",
-                    borderBottom: "1px solid #3e3e42",
-                  }}
-                >
-                  Terminal
-                </div>
+         {/* Input Box */}
+         <div
+           style={{
+             padding: "10px",
+             borderTop: "1px solid #3e3e42",
+           }}
+         >
+           <div style={{ display: "flex", gap: "8px" }}>
+             <input
+               type="text"
+               value={input}
+               onChange={(e) => setInput(e.target.value)}
+               onKeyDown={(e) => e.key === "Enter" && sendMessage()}
+               placeholder="Ask a question..."
+               disabled={sending}
+               style={{
+                 flex: 1,
+                 padding: "10px",
+                 background: "#3c3c3c",
+                 border: "1px solid #555",
+                 borderRadius: "4px",
+                 color: "white",
+                 fontSize: "14px",
+               }}
+             />
+             <button
+               onClick={() => sendMessage()}
+               disabled={sending || !input.trim()}
+               style={{
+                 padding: "10px 20px",
+                 background:
+                   sending || !input.trim() ? "#555" : "#007acc",
+                 color: "white",
+                 border: "none",
+                 borderRadius: "4px",
+                 cursor:
+                   sending || !input.trim() ? "not-allowed" : "pointer",
+               }}
+             >
+               Send
+             </button>
+           </div>
+         </div>
+       </div>
 
-                <div
-                  style={{
-                    flex: 1,
-                    padding: "10px",
-                    overflowY: "auto",
-                    color: "#0f0",
-                    fontFamily: "monospace",
-                    fontSize: "13px",
-                    background: "#1e1e1e",
-                  }}
-                >
-                  {terminalLines.map((line, i) => (
-                    <div key={i}>{line}</div>
-                  ))}
-                  <div ref={terminalRef} />
-                </div>
 
-                <input
-                  type="text"
-                  value={cliInput}
-                  onChange={(e) => setCliInput(e.target.value)}
-                  onKeyDown={handleCliKeyPress}
-                  placeholder='Select "Run Code" then type standard input here and press Enter...'
-                  style={{
-                    padding: "10px",
-                    border: "none",
-                    borderTop: "1px solid #3e3e42",
-                    background: "#1e1e1e",
-                    color: "#0f0",
-                    fontFamily: "monospace",
-                    fontSize: "13px",
-                  }}
-                />
-              </div>
-            ) : (
-              <div
-                style={{
-                  height: "100px",
-                  background: "#1e1e1e",
-                  borderTop: "1px solid #3e3e42",
-                  padding: "10px",
-                  overflowY: "auto",
-                }}
-              >
-                <div
-                  style={{ color: "#888", fontSize: "12px", marginBottom: "5px" }}
-                >
-                  OUTPUT:
-                </div>
-                <pre
-                  style={{
-                    color: "#0f0",
-                    fontSize: "13px",
-                    margin: 0,
-                    fontFamily: "monospace",
-                  }}
-                >
-                  {output || "Click 'Run Code' to see output"}
-                </pre>
-              </div>
-            )}
+       {/* Right Panel */}
+       <div
+         style={{
+           flex: 1,
+           display: "flex",
+           flexDirection: "column",
+           overflow: "hidden",
+         }}
+       >
+         {/* Top toolbar */}
+         <div
+           style={{
+             padding: "10px",
+             background: "#252526",
+             borderBottom: "1px solid #3e3e42",
+             display: "flex",
+             gap: "10px",
+             alignItems: "center",
+           }}
+         >
+           <label
+             style={{
+               color: "white",
+               display: "flex",
+               alignItems: "center",
+               gap: "8px",
+             }}
+           >
+             Language:
+             <select
+               value={language?.id ?? ""}
+               onChange={(e) => handleLanguageChangeById(e.target.value)}
+               style={{
+                 padding: "8px",
+                 background: "#3c3c3c",
+                 color: "white",
+                 border: "1px solid #555",
+                 borderRadius: "4px",
+                 minWidth: "180px",
+               }}
+             >
+               <option value="" disabled>
+                 Select language
+               </option>
+               {languages.map((l) => (
+                 <option key={l.id} value={l.id}>
+                   {l.name}
+                 </option>
+               ))}
+             </select>
 
-            {/* Test Results */}
-            {testResults.length > 0 && (
-              <div
-                style={{
-                  maxHeight: "200px",
-                  background: "#1e1e1e",
-                  borderTop: "1px solid #3e3e42",
-                  padding: "10px",
-                  overflowY: "auto",
-                }}
-              >
-                {/* ... test results ... */}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+
+           </label>
+
+
+           <button
+             onClick={() => setShowCLI(!showCLI)}
+             style={{
+               padding: "8px 16px",
+               background: showCLI ? "#007acc" : "#3a3a3c",
+               color: "white",
+               border: "1px solid #555",
+               borderRadius: "4px",
+               cursor: "pointer",
+             }}
+           >
+             {showCLI ? "📟 CLI On" : "📟 CLI Off"}
+           </button>
+
+
+           {questionData?.testCases && questionData.testCases.length > 0 && (
+             <button
+               onClick={runTestCases}
+               disabled={runningTests}
+               style={{
+                 padding: "8px 16px",
+                 background: runningTests ? "#555" : "#ff9800",
+                 color: "white",
+                 border: "none",
+                 borderRadius: "4px",
+                 cursor: runningTests ? "not-allowed" : "pointer",
+               }}
+             >
+               {runningTests ? "Testing..." : `🧪 Run Tests (${totalTests})`}
+             </button>
+           )}
+
+
+           <button
+             onClick={handleRunCode}
+             disabled={running || !language}
+             style={{
+               padding: "8px 20px",
+               background: running ? "#555" : "#4CAF50",
+               color: "white",
+               border: "none",
+               borderRadius: "4px",
+               cursor: running ? "not-allowed" : "pointer",
+               marginLeft: "auto",
+             }}
+           >
+             {running ? "Running..." : "▶ Run Code"}
+           </button>
+         </div>
+
+
+         {/* Main content: Editor + CLI + Output */}
+         <div
+           style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
+         >
+           {/* Editor */}
+           <div style={{ flex: 1, overflow: "hidden" }}>
+             <Editor
+               key={language?.id ?? "editor-blank"}
+               height="100%"
+               language={language?.monaco || "plaintext"}
+               theme="vs-dark"
+               value={code}
+               onChange={(value) => setCode(value || "")}
+               options={{ fontSize: 14, minimap: { enabled: false }, wordWrap: "on" }}
+             />
+
+
+           </div>
+
+
+           {/* Terminal vs Output */}
+           {showCLI ? (
+             <div
+               style={{
+                 flex: 1,
+                 display: "flex",
+                 flexDirection: "column",
+                 borderTop: "1px solid #3e3e42",
+                 background: "#1e1e1e",
+               }}
+             >
+               <div
+                 style={{
+                   padding: "10px",
+                   fontWeight: "bold",
+                   color: "#fff",
+                   borderBottom: "1px solid #3e3e42",
+                 }}
+               >
+                 Terminal
+               </div>
+
+
+               <div
+                 style={{
+                   flex: 1,
+                   padding: "10px",
+                   overflowY: "auto",
+                   color: "#0f0",
+                   fontFamily: "monospace",
+                   fontSize: "13px",
+                   background: "#1e1e1e",
+                 }}
+               >
+                 {terminalLines.map((line, i) => (
+                   <div key={i}>{line}</div>
+                 ))}
+                 <div ref={terminalRef} />
+               </div>
+
+
+               <input
+                 type="text"
+                 value={cliInput}
+                 onChange={(e) => setCliInput(e.target.value)}
+                 onKeyDown={handleCliKeyPress}
+                 placeholder='Select "Run Code" then type standard input here and press Enter...'
+                 style={{
+                   padding: "10px",
+                   border: "none",
+                   borderTop: "1px solid #3e3e42",
+                   background: "#1e1e1e",
+                   color: "#0f0",
+                   fontFamily: "monospace",
+                   fontSize: "13px",
+                 }}
+               />
+             </div>
+           ) : (
+             <div
+               style={{
+                 height: "100px",
+                 background: "#1e1e1e",
+                 borderTop: "1px solid #3e3e42",
+                 padding: "10px",
+                 overflowY: "auto",
+               }}
+             >
+               <div
+                 style={{ color: "#888", fontSize: "12px", marginBottom: "5px" }}
+               >
+                 OUTPUT:
+               </div>
+               <pre
+                 style={{
+                   color: "#0f0",
+                   fontSize: "13px",
+                   margin: 0,
+                   fontFamily: "monospace",
+                 }}
+               >
+                 {output || "Click 'Run Code' to see output"}
+               </pre>
+             </div>
+           )}
+
+
+           {/* Test Results */}
+           {testResults.length > 0 && (
+             <div
+               style={{
+                 maxHeight: "200px",
+                 background: "#1e1e1e",
+                 borderTop: "1px solid #3e3e42",
+                 padding: "10px",
+                 overflowY: "auto",
+               }}
+             >
+               {/* ... test results ... */}
+             </div>
+           )}
+         </div>
+       </div>
+     </div>
+   </div>
+ );
 }
