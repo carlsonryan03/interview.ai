@@ -198,13 +198,14 @@ const handleRunCode = async () => {
   if (!language) return;
 
   if (showCLI) {
-    setTerminalLines(["Running..."]);
     runCodeWithStdin(""); // submit code with empty stdin initially
     return;
   }
 
   setRunning(true);
-  setOutput("Running...");
+  setOutput("");         // clear previous output
+  appendLine("Running..."); // add placeholder
+
 
   const stdin = "";
 
@@ -458,6 +459,7 @@ const runCodeWithStdin = async (stdinLine = "") => {
   if (!language) return;
   setRunning(true);
 
+  // Add to input buffer
   let updatedBuffer = cliInputBuffer;
   if (stdinLine) updatedBuffer += stdinLine + "\n";
   setCliInputBuffer(updatedBuffer);
@@ -467,6 +469,9 @@ const runCodeWithStdin = async (stdinLine = "") => {
 
     // First submission
     if (!token) {
+      // Add "Running..." placeholder if terminal is empty
+      setTerminalLines(prev => (prev.length === 0 ? ["Running..."] : prev));
+
       const submitRes = await fetch(`${API_URL}/api/submissions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -502,6 +507,9 @@ const runCodeWithStdin = async (stdinLine = "") => {
       result.message ||
       "";
 
+    // Remove "Running..." placeholder if present
+    setTerminalLines(prev => prev.filter(line => line !== "Running..."));
+
     if (stdinLine) appendLine(`> ${stdinLine}`);
     if (outputText) appendLine(outputText);
 
@@ -509,6 +517,8 @@ const runCodeWithStdin = async (stdinLine = "") => {
     setCliInputBuffer("");
     setCliToken(null);
   } catch (err) {
+    // Remove placeholder if present
+    setTerminalLines(prev => prev.filter(line => line !== "Running..."));
     appendLine("Error: " + (err.message || String(err)));
     setCliToken(null);
   } finally {
