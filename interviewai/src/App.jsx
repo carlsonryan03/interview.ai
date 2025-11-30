@@ -147,16 +147,26 @@ export default function App() {
     if (!language) return;
 
     setRunning(true);
-    setOutput("Running...");
 
-    const stdin = showCLI ? cliInput : "";
+    if (showCLI) {
+      // Clear previous terminal lines and show placeholder
+      setTerminalLines(["Running..."]);
+    } else {
+      setOutput("Running...");
+    }
+
+    // Encode stdin for Judge0 API
+    const stdin = showCLI ? btoa(cliInput) : "";
 
     try {
-      // Send code to backend
       const submitRes = await fetch(`${API_URL}/api/submissions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ source_code: code, language_id: language.id, stdin }),
+        body: JSON.stringify({
+          source_code: code,
+          language_id: language.id,
+          stdin: stdin,
+        }),
       });
 
       if (!submitRes.ok) {
@@ -172,42 +182,50 @@ export default function App() {
       for (let i = 0; i < 40; i++) {
         const res = await fetch(`${API_URL}/api/submissions/${token}`);
         const json = await res.json();
-
         if (json.status && json.status.id >= 3) {
           result = json;
           break;
         }
-
         await new Promise((r) => setTimeout(r, 500));
       }
 
       if (!result) throw new Error("Timed out waiting for result");
 
-      // Decode base64 if necessary
-      const decodeBase64 = (str) => {
+      const safeDecode = (str) => {
         if (!str) return "";
         try {
           return atob(str);
         } catch {
-          return str; // fallback if not valid base64
+          return str;
         }
       };
 
       const outputText =
-        decodeBase64(result.stdout) ||
-        decodeBase64(result.compile_output) ||
-        decodeBase64(result.stderr) ||
+        safeDecode(result.stdout) ||
+        safeDecode(result.compile_output) ||
+        safeDecode(result.stderr) ||
         result.message ||
         "No output";
 
-      setOutput(outputText);
-
+      if (showCLI) {
+        // Replace "Running..." with actual output
+        setTerminalLines(outputText.split("\n"));
+      } else {
+        setOutput(outputText);
+      }
     } catch (err) {
-      setOutput("Error: " + (err?.message || String(err)));
+      if (showCLI) {
+        setTerminalLines([`Error: ${err?.message || String(err)}`]);
+      } else {
+        setOutput("Error: " + (err?.message || String(err)));
+      }
     } finally {
       setRunning(false);
     }
   };
+
+
+
 
 
   const runTestCases = async () => {
@@ -363,12 +381,104 @@ export default function App() {
   const passedTests = testResults.filter(r => r.passed).length;
   const totalTests = testResults.length;
 
+  const [terminalLines, setTerminalLines] = useState([]);
+  const terminalRef = useRef(null);
+
+  // Auto-scroll terminal
+  useEffect(() => {
+    terminalRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [terminalLines]);
+
+  const appendLine = (text) => setTerminalLines((lines) => [...lines, text]);
+
+  const handleCliKeyPress = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const inputLine = cliInput.trim();
+      if (!inputLine) return;
+      setCliInput("");
+      appendLine(`> ${inputLine}`);
+      runCodeWithStdin(inputLine);
+    }
+  };
+
+  const runCodeWithStdin = async (stdinLine) => {
+  if (!language) return;
+  setRunning(true);
+
+  try {
+    const submitRes = await fetch(`${API_URL}/api/submissions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        source_code: code,
+        language_id: language.id,
+        stdin: btoa(stdinLine + "\n"),
+      }),
+    });
+
+    const { token } = await submitRes.json();
+    let result = null;
+    for (let i = 0; i < 40; i++) {
+      const res = await fetch(`${API_URL}/api/submissions/${token}`);
+      const json = await res.json();
+      if (json.status && json.status.id >= 3) {
+        result = json;
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 500));
+    }
+
+    const decode = (str) => (str ? atob(str) : "");
+    let outputText =
+      decode(result.stdout) || decode(result.compile_output) || decode(result.stderr) || result.message || "";
+
+    // Remove repeated prompt if it matches the stdin line
+    if (showCLI && outputText.endsWith(stdinLine + "\n")) {
+      outputText = outputText.slice(0, -stdinLine.length - 1);
+    }
+
+    appendLine(outputText);
+  } catch (err) {
+    appendLine("Error: " + (err.message || String(err)));
+  } finally {
+    setRunning(false);
+  }
+};
+
+
   return (
-    <div style={{ height: "100vh", width: "100vw", display: "flex", flexDirection: "column", background: "#1e1e1e", overflow: "hidden" }}>
-      <header style={{ padding: "15px 20px", background: "#252526", color: "white", borderBottom: "1px solid #3e3e42", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+    <div
+      style={{
+        height: "100vh",
+        width: "100vw",
+        display: "flex",
+        flexDirection: "column",
+        background: "#1e1e1e",
+        overflow: "hidden",
+      }}
+    >
+      {/* Header */}
+      <header
+        style={{
+          padding: "15px 20px",
+          background: "#252526",
+          color: "white",
+          borderBottom: "1px solid #3e3e42",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
         <h2 style={{ margin: 0 }}>💻 AI Coding Interview</h2>
         {timerActive && (
-          <div style={{ fontSize: "24px", fontWeight: "bold", color: timer > 1800 ? "#ff6b6b" : "#4CAF50" }}>
+          <div
+            style={{
+              fontSize: "24px",
+              fontWeight: "bold",
+              color: timer > 1800 ? "#ff6b6b" : "#4CAF50",
+            }}
+          >
             ⏱️ {formatTime(timer)}
           </div>
         )}
@@ -376,7 +486,19 @@ export default function App() {
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* Left Panel */}
-        <div style={{ width: "35%", minWidth: "300px", maxWidth: "500px", display: "flex", flexDirection: "column", borderRight: "1px solid #3e3e42", background: "#252526", overflow: "hidden" }}>
+        <div
+          style={{
+            width: "35%",
+            minWidth: "300px",
+            maxWidth: "500px",
+            display: "flex",
+            flexDirection: "column",
+            borderRight: "1px solid #3e3e42",
+            background: "#252526",
+            overflow: "hidden",
+          }}
+        >
+          {/* Topic/Difficulty & Generate Question */}
           <div style={{ padding: "15px", borderBottom: "1px solid #3e3e42" }}>
             <div style={{ marginBottom: "10px", display: "flex", gap: "10px" }}>
               <input
@@ -384,12 +506,25 @@ export default function App() {
                 placeholder="Topic (e.g., arrays, strings)"
                 value={topic}
                 onChange={(e) => setTopic(e.target.value)}
-                style={{ flex: 1, padding: "8px", background: "#3c3c3c", color: "white", border: "1px solid #555", borderRadius: "4px" }}
+                style={{
+                  flex: 1,
+                  padding: "8px",
+                  background: "#3c3c3c",
+                  color: "white",
+                  border: "1px solid #555",
+                  borderRadius: "4px",
+                }}
               />
               <select
                 value={difficulty}
                 onChange={(e) => setDifficulty(e.target.value)}
-                style={{ padding: "8px", background: "#3c3c3c", color: "white", border: "1px solid #555", borderRadius: "4px" }}
+                style={{
+                  padding: "8px",
+                  background: "#3c3c3c",
+                  color: "white",
+                  border: "1px solid #555",
+                  borderRadius: "4px",
+                }}
               >
                 <option value="easy">Easy</option>
                 <option value="medium">Medium</option>
@@ -400,7 +535,15 @@ export default function App() {
             <button
               onClick={generateQuestion}
               disabled={loadingQuestion}
-              style={{ padding: "10px 20px", background: "#007acc", color: "white", border: "none", borderRadius: "4px", cursor: loadingQuestion ? "not-allowed" : "pointer", width: "100%" }}
+              style={{
+                padding: "10px 20px",
+                background: "#007acc",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: loadingQuestion ? "not-allowed" : "pointer",
+                width: "100%",
+              }}
             >
               {loadingQuestion ? "Generating..." : "🎲 Generate New Question"}
             </button>
@@ -409,7 +552,13 @@ export default function App() {
           {/* Chat */}
           <div style={{ flex: 1, overflowY: "auto", padding: "15px" }}>
             {messages.length === 0 && (
-              <p style={{ color: "#888", textAlign: "center", marginTop: "20px" }}>
+              <p
+                style={{
+                  color: "#888",
+                  textAlign: "center",
+                  marginTop: "20px",
+                }}
+              >
                 Generate a question to start
               </p>
             )}
@@ -424,10 +573,18 @@ export default function App() {
                   color: "white",
                 }}
               >
-                <div style={{ fontWeight: "bold", marginBottom: "8px", fontSize: "11px", color: "#888", textTransform: "uppercase" }}>
-                  {msg.role === "user" ? "You" : "AI Interviewer"} {msg.streaming && "▋"}
+                <div
+                  style={{
+                    fontWeight: "bold",
+                    marginBottom: "8px",
+                    fontSize: "11px",
+                    color: "#888",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {msg.role === "user" ? "You" : "AI Interviewer"}{" "}
+                  {msg.streaming && "▋"}
                 </div>
-                
                 <div style={{ fontSize: "14px", lineHeight: "1.6" }}>
                   <ReactMarkdown rehypePlugins={[rehypeRaw]}>
                     {msg.content}
@@ -438,32 +595,89 @@ export default function App() {
             <div ref={chatEndRef} />
           </div>
 
+          {/* Hint/Review Buttons */}
           {messages.length > 0 && (
-            <div style={{ padding: "10px", borderTop: "1px solid #3e3e42", display: "flex", gap: "8px" }}>
-              <button onClick={askForHint} disabled={sending} style={{ flex: 1, padding: "8px", background: "#3a3a3c", color: "white", border: "1px solid #555", borderRadius: "4px", cursor: sending ? "not-allowed" : "pointer", fontSize: "12px" }}>
+            <div
+              style={{
+                padding: "10px",
+                borderTop: "1px solid #3e3e42",
+                display: "flex",
+                gap: "8px",
+              }}
+            >
+              <button
+                onClick={askForHint}
+                disabled={sending}
+                style={{
+                  flex: 1,
+                  padding: "8px",
+                  background: "#3a3a3c",
+                  color: "white",
+                  border: "1px solid #555",
+                  borderRadius: "4px",
+                  cursor: sending ? "not-allowed" : "pointer",
+                  fontSize: "12px",
+                }}
+              >
                 💡 Hint
               </button>
-              <button onClick={submitForReview} disabled={sending} style={{ flex: 1, padding: "8px", background: "#3a3a3c", color: "white", border: "1px solid #555", borderRadius: "4px", cursor: sending ? "not-allowed" : "pointer", fontSize: "12px" }}>
+              <button
+                onClick={submitForReview}
+                disabled={sending}
+                style={{
+                  flex: 1,
+                  padding: "8px",
+                  background: "#3a3a3c",
+                  color: "white",
+                  border: "1px solid #555",
+                  borderRadius: "4px",
+                  cursor: sending ? "not-allowed" : "pointer",
+                  fontSize: "12px",
+                }}
+              >
                 ✓ Review
               </button>
             </div>
           )}
 
-          <div style={{ padding: "10px", borderTop: "1px solid #3e3e42" }}>
+          {/* Input Box */}
+          <div
+            style={{
+              padding: "10px",
+              borderTop: "1px solid #3e3e42",
+            }}
+          >
             <div style={{ display: "flex", gap: "8px" }}>
               <input
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && sendMessage()}
+                onKeyDown={(e) => e.key === "Enter" && sendMessage()}
                 placeholder="Ask a question..."
                 disabled={sending}
-                style={{ flex: 1, padding: "10px", background: "#3c3c3c", border: "1px solid #555", borderRadius: "4px", color: "white", fontSize: "14px" }}
+                style={{
+                  flex: 1,
+                  padding: "10px",
+                  background: "#3c3c3c",
+                  border: "1px solid #555",
+                  borderRadius: "4px",
+                  color: "white",
+                  fontSize: "14px",
+                }}
               />
               <button
                 onClick={() => sendMessage()}
                 disabled={sending || !input.trim()}
-                style={{ padding: "10px 20px", background: sending || !input.trim() ? "#555" : "#007acc", color: "white", border: "none", borderRadius: "4px", cursor: sending || !input.trim() ? "not-allowed" : "pointer" }}
+                style={{
+                  padding: "10px 20px",
+                  background:
+                    sending || !input.trim() ? "#555" : "#007acc",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor:
+                    sending || !input.trim() ? "not-allowed" : "pointer",
+                }}
               >
                 Send
               </button>
@@ -472,19 +686,50 @@ export default function App() {
         </div>
 
         {/* Right Panel */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          {/* Top toolbar (fixed height) */}
-          <div style={{ padding: "10px", background: "#252526", borderBottom: "1px solid #3e3e42", display: "flex", gap: "10px", alignItems: "center" }}>
-            {/* Language select */}
-            <label style={{ color: "white", display: "flex", alignItems: "center", gap: "8px" }}>
+        <div
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          {/* Top toolbar */}
+          <div
+            style={{
+              padding: "10px",
+              background: "#252526",
+              borderBottom: "1px solid #3e3e42",
+              display: "flex",
+              gap: "10px",
+              alignItems: "center",
+            }}
+          >
+            <label
+              style={{
+                color: "white",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+              }}
+            >
               Language:
               <select
                 value={language?.id || ""}
                 onChange={(e) => {
-                  const newLang = languages.find((l) => l.id === Number(e.target.value));
+                  const newLang = languages.find(
+                    (l) => l.id === Number(e.target.value)
+                  );
                   if (newLang) handleLanguageChange(newLang);
                 }}
-                style={{ padding: "8px", background: "#3c3c3c", color: "white", border: "1px solid #555", borderRadius: "4px", minWidth: "180px" }}
+                style={{
+                  padding: "8px",
+                  background: "#3c3c3c",
+                  color: "white",
+                  border: "1px solid #555",
+                  borderRadius: "4px",
+                  minWidth: "180px",
+                }}
               >
                 {languages.map((l) => (
                   <option key={l.id} value={l.id}>
@@ -494,20 +739,32 @@ export default function App() {
               </select>
             </label>
 
-            {/* CLI toggle */}
             <button
               onClick={() => setShowCLI(!showCLI)}
-              style={{ padding: "8px 16px", background: showCLI ? "#007acc" : "#3a3a3c", color: "white", border: "1px solid #555", borderRadius: "4px", cursor: "pointer" }}
+              style={{
+                padding: "8px 16px",
+                background: showCLI ? "#007acc" : "#3a3a3c",
+                color: "white",
+                border: "1px solid #555",
+                borderRadius: "4px",
+                cursor: "pointer",
+              }}
             >
               {showCLI ? "📟 CLI On" : "📟 CLI Off"}
             </button>
 
-            {/* Test / Run buttons */}
             {questionData?.testCases && questionData.testCases.length > 0 && (
               <button
                 onClick={runTestCases}
                 disabled={runningTests}
-                style={{ padding: "8px 16px", background: runningTests ? "#555" : "#ff9800", color: "white", border: "none", borderRadius: "4px", cursor: runningTests ? "not-allowed" : "pointer" }}
+                style={{
+                  padding: "8px 16px",
+                  background: runningTests ? "#555" : "#ff9800",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "4px",
+                  cursor: runningTests ? "not-allowed" : "pointer",
+                }}
               >
                 {runningTests ? "Testing..." : `🧪 Run Tests (${totalTests})`}
               </button>
@@ -516,15 +773,25 @@ export default function App() {
             <button
               onClick={handleRunCode}
               disabled={running || !language}
-              style={{ padding: "8px 20px", background: running ? "#555" : "#4CAF50", color: "white", border: "none", borderRadius: "4px", cursor: running ? "not-allowed" : "pointer", marginLeft: "auto" }}
+              style={{
+                padding: "8px 20px",
+                background: running ? "#555" : "#4CAF50",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: running ? "not-allowed" : "pointer",
+                marginLeft: "auto",
+              }}
             >
               {running ? "Running..." : "▶ Run Code"}
             </button>
           </div>
 
           {/* Main content: Editor + CLI + Output */}
-          <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-            {/* Editor takes remaining space */}
+          <div
+            style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}
+          >
+            {/* Editor */}
             <div style={{ flex: 1, overflow: "hidden" }}>
               <Editor
                 height="100%"
@@ -536,37 +803,107 @@ export default function App() {
               />
             </div>
 
-            {/* CLI input */}
-            {showCLI && (
-              <div style={{ padding: "10px", background: "#1e1e1e", borderTop: "1px solid #3e3e42" }}>
-                <div style={{ color: "#888", fontSize: "12px", marginBottom: "5px" }}>STDIN INPUT:</div>
-                <textarea
+            {/* Terminal vs Output */}
+            {showCLI ? (
+              <div
+                style={{
+                  flex: 1,
+                  display: "flex",
+                  flexDirection: "column",
+                  borderTop: "1px solid #3e3e42",
+                  background: "#1e1e1e",
+                }}
+              >
+                <div
+                  style={{
+                    padding: "10px",
+                    fontWeight: "bold",
+                    color: "#fff",
+                    borderBottom: "1px solid #3e3e42",
+                  }}
+                >
+                  Terminal
+                </div>
+
+                <div
+                  style={{
+                    flex: 1,
+                    padding: "10px",
+                    overflowY: "auto",
+                    color: "#0f0",
+                    fontFamily: "monospace",
+                    fontSize: "13px",
+                    background: "#1e1e1e",
+                  }}
+                >
+                  {terminalLines.map((line, i) => (
+                    <div key={i}>{line}</div>
+                  ))}
+                  <div ref={terminalRef} />
+                </div>
+
+                <input
+                  type="text"
                   value={cliInput}
                   onChange={(e) => setCliInput(e.target.value)}
-                  placeholder="Enter input for your program..."
-                  style={{ width: "100%", height: "60px", background: "#2d2d30", border: "1px solid #3e3e42", color: "#0f0", fontFamily: "monospace", fontSize: "13px", padding: "8px", resize: "vertical" }}
+                  onKeyDown={handleCliKeyPress}
+                  placeholder='Select "Run Code" then type standard input here and press Enter...'
+                  style={{
+                    padding: "10px",
+                    border: "none",
+                    borderTop: "1px solid #3e3e42",
+                    background: "#1e1e1e",
+                    color: "#0f0",
+                    fontFamily: "monospace",
+                    fontSize: "13px",
+                  }}
                 />
+              </div>
+            ) : (
+              <div
+                style={{
+                  height: "100px",
+                  background: "#1e1e1e",
+                  borderTop: "1px solid #3e3e42",
+                  padding: "10px",
+                  overflowY: "auto",
+                }}
+              >
+                <div
+                  style={{ color: "#888", fontSize: "12px", marginBottom: "5px" }}
+                >
+                  OUTPUT:
+                </div>
+                <pre
+                  style={{
+                    color: "#0f0",
+                    fontSize: "13px",
+                    margin: 0,
+                    fontFamily: "monospace",
+                  }}
+                >
+                  {output || "Click 'Run Code' to see output"}
+                </pre>
               </div>
             )}
 
-            {/* Output pinned at bottom */}
-            <div style={{ height: "100px", background: "#1e1e1e", borderTop: "1px solid #3e3e42", padding: "10px", overflowY: "auto" }}>
-              <div style={{ color: "#888", fontSize: "12px", marginBottom: "5px" }}>OUTPUT:</div>
-              <pre style={{ color: "#0f0", fontSize: "13px", margin: 0, fontFamily: "monospace" }}>
-                {output || "Click 'Run Code' to see output"}
-              </pre>
-            </div>
+            {/* Test Results */}
+            {testResults.length > 0 && (
+              <div
+                style={{
+                  maxHeight: "200px",
+                  background: "#1e1e1e",
+                  borderTop: "1px solid #3e3e42",
+                  padding: "10px",
+                  overflowY: "auto",
+                }}
+              >
+                {/* ... test results ... */}
+              </div>
+            )}
           </div>
-
-          {/* Test Results */}
-          {testResults.length > 0 && (
-            <div style={{ maxHeight: "200px", background: "#1e1e1e", borderTop: "1px solid #3e3e42", padding: "10px", overflowY: "auto" }}>
-              {/* ... test results ... */}
-            </div>
-          )}
         </div>
       </div>
     </div>
-
   );
 }
