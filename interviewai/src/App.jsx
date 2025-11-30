@@ -216,11 +216,12 @@ export default function App() {
       const data = await res.json();
       setQuestionData(data);
 
-      const questionText = `**${data.title || 'Coding Challenge'}**\n\n${data.description || ''}\n\n${
-        data.examples ? '**Examples:**\n' + data.examples.map((ex, i) => 
-          `Example ${i + 1}:\nInput: ${ex.input}\nOutput: ${ex.output}${ex.explanation ? '\nExplanation: ' + ex.explanation : ''}`
-        ).join('\n\n') : ''
-      }\n\n${data.constraints ? '**Constraints:**\n' + data.constraints.map(c => `• ${c}`).join('\n') : ''}`;
+      const questionText = data.question;
+      // const questionText = `**${data.question || 'Coding Challenge'}**\n\n${data.description || ''}\n\n${
+      //   data.examples ? '**Examples:**\n' + data.examples.map((ex, i) => 
+      //     `Example ${i + 1}:\nInput: ${ex.input}\nOutput: ${ex.output}${ex.explanation ? '\nExplanation: ' + ex.explanation : ''}`
+      //   ).join('\n\n') : ''
+      // }\n\n${data.constraints ? '**Constraints:**\n' + data.constraints.map(c => `• ${c}`).join('\n') : ''}`;
 
       setMessages([{ role: "assistant", content: questionText }]);
       setTimerActive(true);
