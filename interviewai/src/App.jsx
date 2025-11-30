@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from "react";
 import Editor from "@monaco-editor/react";
 
+import ReactMarkdown from "react-markdown";
+import rehypeRaw from "rehype-raw";
+
 const API_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3001";
 
 // Language-specific starter code
@@ -201,36 +204,33 @@ export default function App() {
   };
 
   const generateQuestion = async () => {
-    setLoadingQuestion(true);
-    setTimer(0);
-    setTimerActive(false);
-    setTestResults([]);
+  setLoadingQuestion(true);
+  setTimer(0);
+  setTimerActive(false);
+  setTestResults([]);
 
-    try {
-      const res = await fetch(`${API_URL}/api/generate-question`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, difficulty }),
-      });
+  try {
+    const res = await fetch(`${API_URL}/api/generate-question`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ topic, difficulty }),
+    });
 
-      const data = await res.json();
-      setQuestionData(data);
+    const data = await res.json();
+    setQuestionData(data);
 
-      const questionText = data.question;
-      // const questionText = `**${data.question || 'Coding Challenge'}**\n\n${data.description || ''}\n\n${
-      //   data.examples ? '**Examples:**\n' + data.examples.map((ex, i) => 
-      //     `Example ${i + 1}:\nInput: ${ex.input}\nOutput: ${ex.output}${ex.explanation ? '\nExplanation: ' + ex.explanation : ''}`
-      //   ).join('\n\n') : ''
-      // }\n\n${data.constraints ? '**Constraints:**\n' + data.constraints.map(c => `• ${c}`).join('\n') : ''}`;
+    // Take the backend 'question' field directly
+    const questionText = data.question || "Coding Challenge";
 
-      setMessages([{ role: "assistant", content: questionText }]);
-      setTimerActive(true);
-    } catch (err) {
-      alert("Error generating question: " + err.message);
-    } finally {
-      setLoadingQuestion(false);
-    }
-  };
+    setMessages([{ role: "assistant", content: questionText }]);
+    setTimerActive(true);
+  } catch (err) {
+    alert("Error generating question: " + err.message);
+  } finally {
+    setLoadingQuestion(false);
+  }
+};
+
 
   const sendMessage = async (customMessage = null) => {
     const msg = customMessage || input.trim();
@@ -380,15 +380,23 @@ export default function App() {
             {messages.map((msg, i) => (
               <div
                 key={i}
-                style={{ marginBottom: "15px", padding: "12px", borderRadius: "8px", background: msg.role === "user" ? "#094771" : "#2d2d30", color: "white" }}
+                style={{
+                  marginBottom: "15px",
+                  padding: "12px",
+                  borderRadius: "8px",
+                  background: msg.role === "user" ? "#094771" : "#2d2d30",
+                  color: "white",
+                }}
               >
                 <div style={{ fontWeight: "bold", marginBottom: "8px", fontSize: "11px", color: "#888", textTransform: "uppercase" }}>
                   {msg.role === "user" ? "You" : "AI Interviewer"} {msg.streaming && "▋"}
                 </div>
-                <div
-                  style={{ fontSize: "14px", lineHeight: "1.6" }}
-                  dangerouslySetInnerHTML={{ __html: parseMarkdown(msg.content) }}
-                />
+                
+                <div style={{ fontSize: "14px", lineHeight: "1.6" }}>
+                  <ReactMarkdown rehypePlugins={[rehypeRaw]}>
+                    {msg.content}
+                  </ReactMarkdown>
+                </div>
               </div>
             ))}
             <div ref={chatEndRef} />
