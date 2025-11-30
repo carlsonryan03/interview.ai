@@ -18,8 +18,13 @@ const RAPIDAPI_HOST = process.env.JUDGE0_RAPIDAPI_HOST;
 function buildHeaders() {
   const headers = { 'Content-Type': 'application/json' };
   if (JUDGE0_KEY) {
-    if (RAPIDAPI_HOST) { headers['X-RapidAPI-Key'] = JUDGE0_KEY; headers['X-RapidAPI-Host'] = RAPIDAPI_HOST; }
-    else { headers['X-Auth-Token'] = JUDGE0_KEY; }
+    if (RAPIDAPI_HOST) { 
+      headers['X-RapidAPI-Key'] = JUDGE0_KEY; 
+      headers['X-RapidAPI-Host'] = RAPIDAPI_HOST; 
+    }
+    else { 
+      headers['X-Auth-Token'] = JUDGE0_KEY; 
+    }
   }
   return headers;
 }
@@ -31,23 +36,60 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', message: 'Server i
 app.post('/api/submissions', async (req, res) => {
   try {
     const { source_code, language_id, stdin } = req.body;
-    if (!source_code || !language_id) return res.status(400).json({ error: 'Missing required fields' });
-    if (!JUDGE0_URL) return res.status(500).json({ error: 'Judge0 URL not configured' });
+    
+    console.log('📝 Submission request received:', { language_id, code_length: source_code?.length });
+    
+    if (!source_code || !language_id) {
+      console.error('❌ Missing required fields');
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    
+    if (!JUDGE0_URL) {
+      console.error('❌ Judge0 URL not configured');
+      return res.status(500).json({ error: 'Judge0 URL not configured' });
+    }
 
     const sourceBase64 = Buffer.from(source_code).toString('base64');
     const stdinBase64 = stdin ? Buffer.from(stdin).toString('base64') : '';
 
-    const submitRes = await fetch(`${JUDGE0_URL}/submissions?base64_encoded=true&wait=false`, {
+    const url = `${JUDGE0_URL}/submissions?base64_encoded=true&wait=false`;
+    const headers = buildHeaders();
+    
+    console.log('🔄 Submitting to Judge0:', url);
+    console.log('🔑 Headers:', Object.keys(headers));
+
+    const submitRes = await fetch(url, {
       method: 'POST',
-      headers: buildHeaders(),
-      body: JSON.stringify({ source_code: sourceBase64, language_id, stdin: stdinBase64 }),
+      headers,
+      body: JSON.stringify({ 
+        source_code: sourceBase64, 
+        language_id, 
+        stdin: stdinBase64 
+      }),
     });
 
-    if (!submitRes.ok) throw new Error(await submitRes.text());
-    const { token } = await submitRes.json();
-    if (!token) throw new Error('No token returned from Judge0');
+    console.log('📡 Judge0 response status:', submitRes.status);
+    
+    if (!submitRes.ok) {
+      const errorText = await submitRes.text();
+      console.error('❌ Judge0 error:', errorText);
+      throw new Error(`Judge0 responded with ${submitRes.status}: ${errorText}`);
+    }
+    
+    const data = await submitRes.json();
+    const { token } = data;
+    
+    if (!token) {
+      console.error('❌ No token in response:', data);
+      throw new Error('No token returned from Judge0');
+    }
+    
+    console.log('✅ Submission successful, token:', token);
     res.json({ token });
-  } catch (err) { res.status(500).json({ error: err.message || 'Failed to submit code' }); }
+  } catch (err) { 
+    console.error('❌ Submission error:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to submit code' }); 
+  }
 });
 
 // Judge0: get result
@@ -57,67 +99,151 @@ app.get('/api/submissions/:token', async (req, res) => {
     if (!JUDGE0_URL) return res.status(500).json({ error: 'Judge0 URL not configured' });
 
     const resultRes = await fetch(`${JUDGE0_URL}/submissions/${token}?base64_encoded=true`, { headers: buildHeaders() });
-    if (!resultRes.ok) throw new Error(await resultRes.text());
+    
+    if (!resultRes.ok) {
+      const errorText = await resultRes.text();
+      console.error('❌ Failed to fetch result:', errorText);
+      throw new Error(`Failed to fetch result: ${resultRes.status}`);
+    }
+    
     const result = await resultRes.json();
-    ['stdout','stderr','compile_output','message'].forEach(k => { if (result[k]) result[k] = Buffer.from(result[k], 'base64').toString('utf-8'); });
+    ['stdout','stderr','compile_output','message'].forEach(k => { 
+      if (result[k]) result[k] = Buffer.from(result[k], 'base64').toString('utf-8'); 
+    });
     res.json(result);
-  } catch (err) { res.status(500).json({ error: err.message || 'Failed to fetch result' }); }
+  } catch (err) { 
+    console.error('❌ Result fetch error:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to fetch result' }); 
+  }
 });
 
 // Judge0: get languages
 app.get('/api/languages', async (req, res) => {
   try {
     if (!JUDGE0_URL) return res.status(500).json({ error: 'Judge0 URL not configured' });
+    
     const langRes = await fetch(`${JUDGE0_URL}/languages/all`, { headers: buildHeaders() });
-    if (!langRes.ok) throw new Error('Failed to fetch languages');
+    
+    if (!langRes.ok) {
+      const errorText = await langRes.text();
+      console.error('❌ Failed to fetch languages:', errorText);
+      throw new Error('Failed to fetch languages');
+    }
+    
     res.json(await langRes.json());
-  } catch (err) { res.status(500).json({ error: err.message || 'Failed to fetch languages' }); }
+  } catch (err) { 
+    console.error('❌ Languages fetch error:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to fetch languages' }); 
+  }
 });
 
 // Chat with streaming support
-app.post('/api/chat', async (req, res) => {
+app.post('/api/chat/stream', async (req, res) => {
   try {
-    const { messages, code, output, language, stream } = req.body;
+    const { messages, code, output, language } = req.body;
     if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'Messages array required' });
     if (!process.env.GROQ_API_KEY) return res.status(500).json({ error: 'Groq API key not configured' });
 
     const systemPrompt = `You are an experienced technical interviewer. Current code:\n${code ? code : ''}\nOutput:\n${output ? output : ''}`;
     
-    if (stream) {
-      // Set up SSE headers
-      res.setHeader('Content-Type', 'text/event-stream');
-      res.setHeader('Cache-Control', 'no-cache');
-      res.setHeader('Connection', 'keep-alive');
+    // Set up SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
 
-      const completion = await groq.chat.completions.create({
-        messages: [{ role: 'system', content: systemPrompt }, ...messages],
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.7,
-        max_tokens: 1024,
-        stream: true,
-      });
+    const completion = await groq.chat.completions.create({
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.7,
+      max_tokens: 1024,
+      stream: true,
+    });
 
-      for await (const chunk of completion) {
-        const content = chunk.choices[0]?.delta?.content || '';
-        if (content) {
-          res.write(`data: ${JSON.stringify({ content })}\n\n`);
-        }
+    for await (const chunk of completion) {
+      const content = chunk.choices[0]?.delta?.content || '';
+      if (content) {
+        res.write(`data: ${JSON.stringify({ content })}\n\n`);
       }
-      res.write('data: [DONE]\n\n');
-      res.end();
-    } else {
-      const completion = await groq.chat.completions.create({
-        messages: [{ role: 'system', content: systemPrompt }, ...messages],
-        model: 'llama-3.3-70b-versatile',
-        temperature: 0.7,
-        max_tokens: 1024,
-      });
-      res.json({ message: completion.choices[0]?.message?.content || 'No response' });
     }
+    res.write('data: [DONE]\n\n');
+    res.end();
   } catch (err) { 
+    console.error('❌ Chat stream error:', err.message);
     if (!res.headersSent) {
       res.status(500).json({ error: err.message || 'Failed to get AI response' }); 
     }
+  }
+});
+
+// Fallback non-streaming chat
+app.post('/api/chat', async (req, res) => {
+  try {
+    const { messages, code, output, language } = req.body;
+    if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: 'Messages array required' });
+    if (!process.env.GROQ_API_KEY) return res.status(500).json({ error: 'Groq API key not configured' });
+
+    const systemPrompt = `You are an experienced technical interviewer. Current code:\n${code ? code : ''}\nOutput:\n${output ? output : ''}`;
+    
+    const completion = await groq.chat.completions.create({
+      messages: [{ role: 'system', content: systemPrompt }, ...messages],
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.7,
+      max_tokens: 1024,
+    });
+    res.json({ message: completion.choices[0]?.message?.content || 'No response' });
+  } catch (err) { 
+    console.error('❌ Chat error:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to get AI response' }); 
+  }
+});
+
+// Run test cases
+app.post('/api/run-tests', async (req, res) => {
+  try {
+    const { source_code, language_id, testCases } = req.body;
+    
+    if (!source_code || !language_id || !testCases) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const results = [];
+    
+    for (const testCase of testCases) {
+      const sourceBase64 = Buffer.from(source_code).toString('base64');
+      const stdinBase64 = testCase.input ? Buffer.from(testCase.input).toString('base64') : '';
+
+      const submitRes = await fetch(`${JUDGE0_URL}/submissions?base64_encoded=true&wait=true`, {
+        method: 'POST',
+        headers: buildHeaders(),
+        body: JSON.stringify({ 
+          source_code: sourceBase64, 
+          language_id, 
+          stdin: stdinBase64 
+        }),
+      });
+
+      if (!submitRes.ok) {
+        results.push({ passed: false, error: 'Submission failed' });
+        continue;
+      }
+
+      const result = await submitRes.json();
+      const stdout = result.stdout ? Buffer.from(result.stdout, 'base64').toString('utf-8').trim() : '';
+      const passed = stdout === testCase.expectedOutput.trim();
+      
+      results.push({
+        passed,
+        input: testCase.input,
+        expectedOutput: testCase.expectedOutput,
+        actualOutput: stdout,
+        stderr: result.stderr ? Buffer.from(result.stderr, 'base64').toString('utf-8') : null
+      });
+    }
+
+    res.json({ results });
+  } catch (err) {
+    console.error('❌ Test run error:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to run tests' });
   }
 });
 
@@ -171,6 +297,7 @@ After the problem, provide 3-5 test cases in the following JSON format:
 
     res.json({ question: response, testCases });
   } catch (err) { 
+    console.error('❌ Question generation error:', err.message);
     res.status(500).json({ error: err.message || 'Failed to generate question' }); 
   }
 });
@@ -178,5 +305,7 @@ After the problem, provide 3-5 test cases in the following JSON format:
 app.listen(PORT, () => {
   console.log(`🚀 Backend server running on http://localhost:${PORT}`);
   console.log(`Judge0 URL: ${JUDGE0_URL || 'NOT CONFIGURED'}`);
+  console.log(`Judge0 Key: ${JUDGE0_KEY ? '✓ Configured' : 'NOT CONFIGURED'}`);
+  console.log(`RapidAPI Host: ${RAPIDAPI_HOST || 'Not using RapidAPI'}`);
   console.log(`LLM: ${process.env.GROQ_API_KEY ? 'Groq ✓' : 'NOT CONFIGURED'}`);
 });
