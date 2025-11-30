@@ -242,13 +242,15 @@ const handleRunCode = async () => {
     }
 
     const outputText =
-      decodeBase64Safe(result.stdout) ||
-      decodeBase64Safe(result.compile_output) ||
-      decodeBase64Safe(result.stderr) ||
+      decodeBase64Safe(result.stdout)?.trim() ||
+      decodeBase64Safe(result.compile_output)?.trim() ||
+      decodeBase64Safe(result.stderr)?.trim() ||
       result.message ||
-      "No output";
+      "";
 
-    setOutput(outputText);
+    appendLine(outputText);
+
+    setOutput(outputText); //THIS IS LIKELY WORNG
   } catch (err) {
     setOutput("Error: " + (err.message || String(err)));
   } finally {
@@ -471,7 +473,7 @@ const runCodeWithStdin = async (stdinLine = "") => {
         body: JSON.stringify({
           source_code: code,
           language_id: language.id,
-          stdin: encodeBase64Safe(updatedBuffer),
+          stdin: updatedBuffer
         }),
       });
       const json = await submitRes.json();
