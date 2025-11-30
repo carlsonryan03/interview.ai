@@ -194,72 +194,65 @@ export default function App() {
 
 
 
-const handleRunCode = async () => {
-  if (!language) return;
+  const handleRunCode = async () => {
+    if (!language) return;
 
-  if (showCLI) {
-    runCodeWithStdin(""); // submit code with empty stdin initially
-    return;
-  }
+    setRunning(true);
+    setOutput("");         // clear previous output
+    appendLine("Running..."); // add placeholder
 
-  setRunning(true);
-  setOutput("");         // clear previous output
-  appendLine("Running..."); // add placeholder
+    const stdin = showCLI ? cliInputBuffer || "" : ""; // CLI buffer or empty
 
+    try {
+      const submitRes = await fetch(`${API_URL}/api/submissions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_code: code,
+          language_id: language.id,
+          stdin: stdin
+        }),
+      });
 
-  const stdin = "";
+      const json = await submitRes.json();
+      const token = json.token;
+      if (!token) throw new Error("No token returned from backend");
+      setCliToken(token);
 
-  try {
-    const submitRes = await fetch(`${API_URL}/api/submissions`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        source_code: code,
-        language_id: language.id,
-        stdin: updatedBuffer
-      }),
-    });
-    const json = await submitRes.json();
-    const token = json.token;
-    if (!token) throw new Error("No token returned from backend");
-    setCliToken(token);
-
-    let result = null;
-    const maxPolls = 40; // ~20 seconds
-    for (let i = 0; i < maxPolls; i++) {
-      const res = await fetch(`${API_URL}/api/submissions/${token}`);
-      if (!res.ok) continue;
-      const json = await res.json();
-      if (json.status?.id >= 3) {
-        result = json;
-        break;
+      let result = null;
+      const maxPolls = 40; // ~20 seconds
+      for (let i = 0; i < maxPolls; i++) {
+        const res = await fetch(`${API_URL}/api/submissions/${token}`);
+        if (!res.ok) continue;
+        const json = await res.json();
+        if (json.status?.id >= 3) {
+          result = json;
+          break;
+        }
+        await new Promise(r => setTimeout(r, 500));
       }
-      await new Promise(r => setTimeout(r, 500));
+      console.log("Submission result:", result);
+
+      if (!result) {
+        setOutput("Error: Timed out waiting for backend to finish execution.");
+        return;
+      }
+
+      const outputText =
+        decodeBase64Safe(result.stdout)?.trim() ||
+        decodeBase64Safe(result.compile_output)?.trim() ||
+        decodeBase64Safe(result.stderr)?.trim() ||
+        result.message ||
+        "";
+
+      appendLine(outputText);
+      setOutput(outputText);
+    } catch (err) {
+      setOutput("Error: " + (err.message || String(err)));
+    } finally {
+      setRunning(false);
     }
-    console.log("Submission result:", result);
-
-    if (!result) {
-      setOutput("Error: Timed out waiting for backend to finish execution.");
-      return;
-    }
-
-    const outputText =
-      decodeBase64Safe(result.stdout)?.trim() ||
-      decodeBase64Safe(result.compile_output)?.trim() ||
-      decodeBase64Safe(result.stderr)?.trim() ||
-      result.message ||
-      "";
-
-    appendLine(outputText);
-
-    setOutput(outputText); //THIS IS LIKELY WORNG
-  } catch (err) {
-    setOutput("Error: " + (err.message || String(err)));
-  } finally {
-    setRunning(false);
-  }
-};
-
+  };
 
 
  const runTestCases = async () => {
@@ -456,7 +449,9 @@ const handleRunCode = async () => {
  const [cliInputBuffer, setCliInputBuffer] = useState(""); // stores stdin lines
 const [cliToken, setCliToken] = useState(null);           // stores the current submission token
 
+
 const runCodeWithStdin = async (stdinLine = "") => {
+  
   if (!language) return;
   setRunning(true);
 
