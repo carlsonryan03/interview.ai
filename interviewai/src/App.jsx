@@ -133,7 +133,7 @@ export default function App() {
 
 
        // Filter out archived safely
-       const activeLangs = Array.isArray(langs) ? langs.filter(l => !l.archived) : [];
+       const activeLangs = Array.isArray(langs) ? langs.filter(l => !l.is_archived && !l.archived) : [];
 
 
        const mapped = activeLangs
