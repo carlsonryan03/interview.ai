@@ -1,7 +1,9 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import Groq from 'groq-sdk';
+import { router as authRouter } from './auth.js';
 
 dotenv.config();
 const app = express();
@@ -14,6 +16,9 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const JUDGE0_URL = (process.env.JUDGE0_URL || '').replace(/\/+$/, '');
 const JUDGE0_KEY = process.env.JUDGE0_KEY;
 const RAPIDAPI_HOST = process.env.JUDGE0_RAPIDAPI_HOST;
+
+// Add auth routes
+app.use('/api/auth', authRouter);
 
 function buildHeaders() {
   const headers = { 'Content-Type': 'application/json' };

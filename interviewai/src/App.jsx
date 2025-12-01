@@ -249,7 +249,7 @@ function decodeBase64Safe(str) {
   }
 }
 
-export default function App() {
+export default function App({ user, onLogout }) {
  const [languages, setLanguages] = useState([]);
  const [language, setLanguage] = useState(null);
  const [code, setCode] = useState("// Type your code here\n");
@@ -335,11 +335,6 @@ export default function App() {
    loadLanguages();
  }, []);
 
-
-
-
-
-
  // existing handleLanguageChange that accepts object stays:
  const handleLanguageChange = (newLanguage) => {
    if (!newLanguage) return;
@@ -354,8 +349,6 @@ export default function App() {
    if (selected) handleLanguageChange(selected);
    else console.warn("Selected language id not found:", id);
  };
-
-
 
 
   const handleRunCode = async () => {
@@ -726,6 +719,19 @@ const handleCliKeyPress = (e) => {
            ⏱️ {formatTime(timer)}
          </div>
        )}
+       <button
+          onClick={onLogout}
+          style={{
+            padding: "8px 16px",
+            background: "#ff4444",
+            color: "white",
+            border: "none",
+            borderRadius: "4px",
+            cursor: "pointer",
+          }}
+        >
+          Logout
+      </button>
      </header>
 
 
