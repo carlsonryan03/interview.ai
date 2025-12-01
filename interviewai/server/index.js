@@ -160,6 +160,7 @@ Provide a concise suggestion or helpful feedback for the user.
     throw err;
   }
 }
+
 // In index.js - update the /api/ai-feedback endpoint
 app.post("/api/ai-feedback", async (req, res) => {
   try {
@@ -175,19 +176,12 @@ app.post("/api/ai-feedback", async (req, res) => {
 
     // Adjust prompt based on help level
     const helpInstructions = {
-      easy: 'Provide detailed, encouraging feedback with specific suggestions and explanations. Be very helpful and guide them step by step.',
-      medium: 'Provide balanced feedback - point out issues and give helpful hints without solving it for them.',
-      hard: 'Provide minimal, subtle hints. Only point out critical errors or misconceptions. Let them figure it out mostly on their own.',
+      easy: 'Provide detailed, encouraging feedback with specific suggestions and explanations (2-3 sentences). Be very helpful and guide them step by step.',
+      medium: 'Provide balanced feedback in 1-2 sentences - point out issues and give helpful hints without solving it for them.',
+      hard: 'Provide minimal, subtle hints in 1 sentence only. Only point out critical errors or misconceptions. Let them figure it out mostly on their own.',
     };
 
     const instruction = helpInstructions[helpLevel] || helpInstructions.medium;
-
-    // Adjust max tokens based on help level
-    const maxTokens = {
-      easy: 200,
-      medium: 150,
-      hard: 100,
-    };
 
     const prompt = `You are a helpful coding assistant. The user is working on a coding problem in ${language || 'an unknown language'}.
 
@@ -201,25 +195,23 @@ ${conversation || 'No previous conversation'}
 
 Help Level Instructions: ${instruction}
 
-Provide a brief, helpful suggestion about:
-- Potential bugs or issues you notice
-- Code improvements or optimizations
-- Logic errors or edge cases
-- Better approaches to consider
+Provide a brief, helpful suggestion about potential bugs, improvements, logic errors, or better approaches.
 
-Keep it concise and match the help level requested.`;
+IMPORTANT: ${helpLevel === 'hard' ? 'Keep your response to EXACTLY 1 sentence and only hint at a next step'
+           : helpLevel === 'medium' ? 'Keep your response to 1-2 sentences maximum and don\'t give away the solution.'  
+           : 'Keep your response to 2-3 sentences maximum.'}`;
 
     const completion = await groq.chat.completions.create({
       messages: [
         { 
           role: 'system', 
-          content: `You are a coding assistant. ${instruction}` 
+          content: `You are a concise coding assistant. ${instruction} Always stay within the sentence limit specified.` 
         },
         { role: 'user', content: prompt }
       ],
       model: 'llama-3.3-70b-versatile',
       temperature: 0.7,
-      max_tokens: maxTokens[helpLevel] || 150,
+      max_tokens: 500, // Increased to allow full responses without cutoff
     });
 
     const suggestion = completion.choices[0]?.message?.content || 'Looking good so far!';
