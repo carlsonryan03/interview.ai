@@ -355,8 +355,11 @@ export default function App({ user, onLogout }) {
     if (!language) return;
 
     setRunning(true);
+    setTerminalLines([]);
     setOutput("");         // clear previous output
+    setTerminalLines(prev => prev.filter(line => line !== "Running..."));
     appendLine("Running..."); // add placeholder
+    setCliToken(null);
 
     const stdin = showCLI ? cliInputBuffer || "" : ""; // CLI buffer or empty
 
@@ -619,7 +622,6 @@ const runCodeWithStdin = async (stdinLine = "") => {
 
   try {
     // Always submit fresh code
-    appendLine("Running...");
     const submitRes = await fetch(`${API_URL}/api/submissions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -647,25 +649,37 @@ const runCodeWithStdin = async (stdinLine = "") => {
     }
     if (!result) throw new Error("Timed out waiting for result");
 
+    if (stdinLine) appendLine(`> ${stdinLine}`); // show user input
+
     const outputText =
-      decodeBase64Safe(result.stdout) ||
-      decodeBase64Safe(result.compile_output) ||
-      decodeBase64Safe(result.stderr) ||
+      decodeBase64Safe(result.stdout)?.trim() ||
+      decodeBase64Safe(result.compile_output)?.trim() ||
+      decodeBase64Safe(result.stderr)?.trim() ||
       result.message ||
       "";
 
-    // Remove "Running..." placeholder if present
-    setTerminalLines(prev => prev.filter(line => line !== "Running..."));
+      const lines = outputText.split("\n");
 
-    if (stdinLine) appendLine(`> ${stdinLine}`);
-    if (outputText) appendLine(outputText);
+      lines.forEach(line => {
+      if (line.trim() !== stdinLine && !line.includes(stdinLine)) {
+        appendLine(line);
+      }
+    });
+    // Only show the backend output if it is NOT the same as the prompt
+    const filteredOutput = outputText
+      .split("\n")
+      .filter(line => line.trim() !== stdinLine) // remove the duplicated input line
+      .join("\n");
+
+    if (filteredOutput) appendLine(filteredOutput); // show backend response
+
 
     // Reset CLI state if finished
     setCliInputBuffer("");
     setCliToken(null);
   } catch (err) {
     // Remove placeholder if present
-    setTerminalLines(prev => prev.filter(line => line !== "Running..."));
+    // setTerminalLines(prev => prev.filter(line => line !== "Running..."));
     appendLine("Error: " + (err.message || String(err)));
     setCliToken(null);
   } finally {
