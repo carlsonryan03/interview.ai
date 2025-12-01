@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import Editor from "@monaco-editor/react";
-
+import axios from "axios";
 
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
@@ -229,7 +229,6 @@ function mapToMonaco(name = "") {
   return "plaintext";
 }
 
-
 function formatTime(seconds) {
  const mins = Math.floor(seconds / 60);
  const secs = seconds % 60;
@@ -250,28 +249,37 @@ function decodeBase64Safe(str) {
 }
 
 export default function App({ user, onLogout }) {
- const [languages, setLanguages] = useState([]);
- const [language, setLanguage] = useState(null);
- const [code, setCode] = useState("// Type your code here\n");
- const [output, setOutput] = useState("");
- const [running, setRunning] = useState(false);
- const [messages, setMessages] = useState([]);
- const [input, setInput] = useState("");
- const [sending, setSending] = useState(false);
- const [questionData, setQuestionData] = useState(null);
- const [loadingQuestion, setLoadingQuestion] = useState(false);
- const [topic, setTopic] = useState("");
- const [difficulty, setDifficulty] = useState("medium");
- const [testResults, setTestResults] = useState([]);
- const [runningTests, setRunningTests] = useState(false);
- const [timer, setTimer] = useState(0);
- const [timerActive, setTimerActive] = useState(false);
- const [showCLI, setShowCLI] = useState(false);
- const [cliInput, setCliInput] = useState("");
- const chatEndRef = useRef(null);
- const streamingMessageRef = useRef("");
+  const [languages, setLanguages] = useState([]);
+  const [language, setLanguage] = useState(null);
+  const [code, setCode] = useState("// Type your code here\n");
+  const [output, setOutput] = useState("");
+  const [running, setRunning] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const [questionData, setQuestionData] = useState(null);
+  const [loadingQuestion, setLoadingQuestion] = useState(false);
+  const [topic, setTopic] = useState("");
+  const [difficulty, setDifficulty] = useState("medium");
+  const [testResults, setTestResults] = useState([]);
+  const [runningTests, setRunningTests] = useState(false);
+  const [timer, setTimer] = useState(0);
+  const [timerActive, setTimerActive] = useState(false);
+  const [showCLI, setShowCLI] = useState(false);
+  const [cliInput, setCliInput] = useState("");
+  const [showTests, setShowTests] = useState(false);
+  const [helpLevel, setHelpLevel] = useState("off"); // "off", "hard", "medium", "easy"
+  const [terminalLines, setTerminalLines] = useState([]);
+  const [cliInputBuffer, setCliInputBuffer] = useState("");
+  const [cliToken, setCliToken] = useState(null);
+  
+  const chatEndRef = useRef(null);
+  const streamingMessageRef = useRef("");
+  const terminalRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+  const lastCodeRef = useRef(code);
 
-const [showTests, setShowTests] = useState(false);
+  useEffect(() => scrollToBottom(), [messages]);
 
  const scrollToBottom = () => chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
  useEffect(() => scrollToBottom(), [messages]);
@@ -287,6 +295,78 @@ const [showTests, setShowTests] = useState(false);
    }
    return () => clearInterval(interval);
  }, [timerActive]);
+// Extra Helpful AI Mode - debounced feedback on CODE changes
+useEffect(() => {
+  if (helpLevel === "off") return;
+  if (!code || code.trim() === "") return;
+  if (!questionData) return;
+  
+  // Don't trigger on first load or if code hasn't actually changed
+  if (code === lastCodeRef.current) return;
+  lastCodeRef.current = code;
+
+  // Clear existing timeout
+  if (typingTimeoutRef.current) {
+    clearTimeout(typingTimeoutRef.current);
+  }
+
+  // Different delays based on help level
+  const delays = {
+    easy: 1500,    // 1.5 seconds - frequent
+    medium: 3000,  // 3 seconds - balanced
+    hard: 5000,    // 5 seconds - sparse
+  };
+
+  const delay = delays[helpLevel] || 3000;
+
+  // Wait based on help level after user stops typing
+  typingTimeoutRef.current = setTimeout(async () => {
+    try {
+      console.log("🤖 Requesting AI feedback at level:", helpLevel);
+      
+      const conversationString = messages
+        .map(m => `${m.role}: ${m.content}`)
+        .join("\n");
+
+      const res = await fetch(`${API_URL}/api/ai-feedback`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code,
+          conversation: conversationString,
+          language: language?.name || "unknown",
+          helpLevel, // Send help level to backend
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
+      }
+
+      const data = await res.json();
+      const aiMessage = data.suggestion;
+
+      if (aiMessage && aiMessage.trim() !== "") {
+        setMessages(prev => [
+          ...prev,
+          {
+            role: "assistant",
+            content: `💡 **Auto-suggestion**: ${aiMessage}`,
+          },
+        ]);
+      }
+    } catch (err) {
+      console.error("AI feedback error:", err);
+    }
+  }, delay);
+
+  return () => {
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+  };
+}, [code, helpLevel, messages, language, questionData]);
+
 
 
  useEffect(() => {
@@ -595,11 +675,6 @@ const [showTests, setShowTests] = useState(false);
  const passedTests = testResults.filter(r => r.passed).length;
  const totalTests = testResults.length;
 
-
- const [terminalLines, setTerminalLines] = useState([]);
- const terminalRef = useRef(null);
-
-
  // Auto-scroll terminal
  useEffect(() => {
    terminalRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -607,10 +682,6 @@ const [showTests, setShowTests] = useState(false);
 
 
  const appendLine = (text) => setTerminalLines((lines) => [...lines, text]);
-
- const [cliInputBuffer, setCliInputBuffer] = useState(""); // stores stdin lines
-const [cliToken, setCliToken] = useState(null);           // stores the current submission token
-
 
 const runCodeWithStdin = async (stdinLine = "") => {
   
@@ -699,20 +770,18 @@ const handleCliKeyPress = (e) => {
   }
 };
 
-
  return (
-   <div
-     style={{
-       height: "100vh",
-       width: "100vw",
-       display: "flex",
-       flexDirection: "column",
-       background: "#1e1e1e",
-       overflow: "hidden",
-     }}
-   >
-     {/* Header */}
-     <header
+    <div
+      style={{
+        height: "100vh",
+        width: "100vw",
+        display: "flex",
+        flexDirection: "column",
+        background: "#1e1e1e",
+        overflow: "hidden",
+      }}
+    >
+      <header
        style={{
          padding: "15px 20px",
          background: "#252526",
@@ -771,56 +840,96 @@ const handleCliKeyPress = (e) => {
        >
          {/* Topic/Difficulty & Generate Question */}
          <div style={{ padding: "15px", borderBottom: "1px solid #3e3e42" }}>
-           <div style={{ marginBottom: "10px", display: "flex", gap: "10px" }}>
-             <input
-               type="text"
-               placeholder="Topic (e.g., arrays, strings)"
-               value={topic}
-               onChange={(e) => setTopic(e.target.value)}
-               style={{
-                 flex: 1,
-                 padding: "8px",
-                 background: "#3c3c3c",
-                 color: "white",
-                 border: "1px solid #555",
-                 borderRadius: "4px",
-               }}
-             />
-             <select
-               value={difficulty}
-               onChange={(e) => setDifficulty(e.target.value)}
-               style={{
-                 padding: "8px",
-                 background: "#3c3c3c",
-                 color: "white",
-                 border: "1px solid #555",
-                 borderRadius: "4px",
-               }}
-             >
-               <option value="easy">Easy</option>
-               <option value="medium">Medium</option>
-               <option value="hard">Hard</option>
-             </select>
-           </div>
+            {/* Topic input */}
+            <input
+              type="text"
+              placeholder="Topic (e.g., arrays, strings)"
+              value={topic}
+              onChange={(e) => setTopic(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "8px",
+                marginBottom: "10px",
+                background: "#3c3c3c",
+                color: "white",
+                border: "1px solid #555",
+                borderRadius: "4px",
+                fontSize: "14px",
+                boxSizing: "border-box", // Add this line
+              }}
+            />
 
+            {/* Difficulty and AI Help in one row */}
+            <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+              <div style={{ flex: 1 }}>
+                <label style={{ color: "#888", fontSize: "12px", marginBottom: "4px", display: "block" }}>
+                  Question Difficulty
+                </label>
+                <select
+                  value={difficulty}
+                  onChange={(e) => setDifficulty(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "8px",
+                    background: "#3c3c3c",
+                    color: "white",
+                    border: "1px solid #555",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                  }}
+                >
+                  <option value="easy">Easy</option>
+                  <option value="medium">Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </div>
 
-           <button
-             onClick={generateQuestion}
-             disabled={loadingQuestion}
-             style={{
-               padding: "10px 20px",
-               background: "#007acc",
-               color: "white",
-               border: "none",
-               borderRadius: "4px",
-               cursor: loadingQuestion ? "not-allowed" : "pointer",
-               width: "100%",
-             }}
-           >
-             {loadingQuestion ? "Generating..." : "🎲 Generate New Question"}
-           </button>
-         </div>
+              <div style={{ flex: 1 }}>
+                <label style={{ color: "#888", fontSize: "12px", marginBottom: "4px", display: "block" }}>
+                  Auto-Suggest
+                </label>
+                <select
+                  value={helpLevel}
+                  onChange={(e) => setHelpLevel(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "8px",
+                    background: "#3c3c3c",
+                    color: "white",
+                    border: "1px solid #555",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                  }}
+                >
+                  <option value="off">Off</option>
+                  <option value="hard">Minimal</option>
+                  <option value="medium">Moderate</option>
+                  <option value="easy">Maximum</option>
+                </select>
+              </div>
+            </div>
 
+            {/* Single Generate button */}
+            <button
+              onClick={generateQuestion}
+              disabled={loadingQuestion}
+              style={{
+                padding: "10px 20px",
+                background: "#007acc",
+                color: "white",
+                border: "none",
+                borderRadius: "4px",
+                cursor: loadingQuestion ? "not-allowed" : "pointer",
+                width: "100%",
+                fontSize: "14px",
+                fontWeight: "500",
+              }}
+            >
+              {loadingQuestion ? "Generating..." : "🎲 Generate New Question"}
+            </button>
+          </div>
 
          {/* Chat */}
          <div style={{ flex: 1, overflowY: "auto", padding: "15px" }}>

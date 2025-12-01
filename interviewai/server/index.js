@@ -160,10 +160,10 @@ Provide a concise suggestion or helpful feedback for the user.
     throw err;
   }
 }
-
+// In index.js - update the /api/ai-feedback endpoint
 app.post("/api/ai-feedback", async (req, res) => {
   try {
-    const { code, conversation, language } = req.body;
+    const { code, conversation, language, helpLevel = "medium" } = req.body;
     
     if (!code) {
       return res.status(400).json({ error: 'Code is required' });
@@ -173,7 +173,22 @@ app.post("/api/ai-feedback", async (req, res) => {
       return res.status(500).json({ error: 'Groq API key not configured' });
     }
 
-    // Create a concise prompt for feedback
+    // Adjust prompt based on help level
+    const helpInstructions = {
+      easy: 'Provide detailed, encouraging feedback with specific suggestions and explanations. Be very helpful and guide them step by step.',
+      medium: 'Provide balanced feedback - point out issues and give helpful hints without solving it for them.',
+      hard: 'Provide minimal, subtle hints. Only point out critical errors or misconceptions. Let them figure it out mostly on their own.',
+    };
+
+    const instruction = helpInstructions[helpLevel] || helpInstructions.medium;
+
+    // Adjust max tokens based on help level
+    const maxTokens = {
+      easy: 200,
+      medium: 150,
+      hard: 100,
+    };
+
     const prompt = `You are a helpful coding assistant. The user is working on a coding problem in ${language || 'an unknown language'}.
 
 Current code:
@@ -184,30 +199,32 @@ ${code}
 Recent conversation:
 ${conversation || 'No previous conversation'}
 
-Provide a BRIEF, helpful suggestion (1-2 sentences max) about:
+Help Level Instructions: ${instruction}
+
+Provide a brief, helpful suggestion about:
 - Potential bugs or issues you notice
 - Code improvements or optimizations
 - Logic errors or edge cases
 - Better approaches to consider
 
-Keep it concise and actionable. Don't rewrite their code, just give a quick tip.`;
+Keep it concise and match the help level requested.`;
 
     const completion = await groq.chat.completions.create({
       messages: [
         { 
           role: 'system', 
-          content: 'You are a concise coding assistant. Give brief, helpful suggestions in 1-2 sentences.' 
+          content: `You are a coding assistant. ${instruction}` 
         },
         { role: 'user', content: prompt }
       ],
       model: 'llama-3.3-70b-versatile',
       temperature: 0.7,
-      max_tokens: 150, // Keep responses short
+      max_tokens: maxTokens[helpLevel] || 150,
     });
 
     const suggestion = completion.choices[0]?.message?.content || 'Looking good so far!';
     
-    console.log('✅ AI Feedback generated:', suggestion.substring(0, 50) + '...');
+    console.log(`✅ AI Feedback generated (${helpLevel} level):`, suggestion.substring(0, 50) + '...');
     res.json({ suggestion });
     
   } catch (err) {
