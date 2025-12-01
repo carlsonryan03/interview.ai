@@ -1,7 +1,6 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import Groq from 'groq-sdk';
 import { router as authRouter } from './auth.js';
 
@@ -119,6 +118,101 @@ app.get('/api/submissions/:token', async (req, res) => {
   } catch (err) { 
     console.error('❌ Result fetch error:', err.message);
     res.status(500).json({ error: err.message || 'Failed to fetch result' }); 
+  }
+});
+
+export async function generateFeedback(code, conversation) {
+  console.log("Grok API key inside generateFeedback:", process.env.OPENAI_API_KEY);
+
+  try {
+    // If conversation contains objects, map them to strings
+    const convoText = conversation
+      .map(msg => (typeof msg === 'string' ? msg : `${msg.role}: ${msg.content}`))
+      .join("\n");
+
+    const prompt = `
+You are an AI co-programmer. The user has written the following code:
+${code}
+
+The conversation so far is:
+${convoText}
+
+Provide a concise suggestion or helpful feedback for the user.
+`;
+
+    const response = await axios.post(
+      "https://api.openai.com/v1/responses",
+      { model: "grok-1", input: prompt },
+      { headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+        },
+      }
+    );
+
+    console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY);
+
+    console.log("Grok response:", response.data);
+
+    return response.data.output_text || "No suggestion available";
+  } catch (err) {
+    console.error("Full error generating feedback:", err.response?.data || err.message);
+    throw err;
+  }
+}
+
+app.post("/api/ai-feedback", async (req, res) => {
+  try {
+    const { code, conversation, language } = req.body;
+    
+    if (!code) {
+      return res.status(400).json({ error: 'Code is required' });
+    }
+
+    if (!process.env.GROQ_API_KEY) {
+      return res.status(500).json({ error: 'Groq API key not configured' });
+    }
+
+    // Create a concise prompt for feedback
+    const prompt = `You are a helpful coding assistant. The user is working on a coding problem in ${language || 'an unknown language'}.
+
+Current code:
+\`\`\`
+${code}
+\`\`\`
+
+Recent conversation:
+${conversation || 'No previous conversation'}
+
+Provide a BRIEF, helpful suggestion (1-2 sentences max) about:
+- Potential bugs or issues you notice
+- Code improvements or optimizations
+- Logic errors or edge cases
+- Better approaches to consider
+
+Keep it concise and actionable. Don't rewrite their code, just give a quick tip.`;
+
+    const completion = await groq.chat.completions.create({
+      messages: [
+        { 
+          role: 'system', 
+          content: 'You are a concise coding assistant. Give brief, helpful suggestions in 1-2 sentences.' 
+        },
+        { role: 'user', content: prompt }
+      ],
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.7,
+      max_tokens: 150, // Keep responses short
+    });
+
+    const suggestion = completion.choices[0]?.message?.content || 'Looking good so far!';
+    
+    console.log('✅ AI Feedback generated:', suggestion.substring(0, 50) + '...');
+    res.json({ suggestion });
+    
+  } catch (err) {
+    console.error('❌ AI Feedback Error:', err.message);
+    res.status(500).json({ error: 'Failed to get AI feedback' });
   }
 });
 
