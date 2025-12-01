@@ -271,6 +271,7 @@ export default function App({ user, onLogout }) {
  const chatEndRef = useRef(null);
  const streamingMessageRef = useRef("");
 
+const [showTests, setShowTests] = useState(false);
 
  const scrollToBottom = () => chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
  useEffect(() => scrollToBottom(), [messages]);
@@ -440,6 +441,7 @@ export default function App({ user, onLogout }) {
 
      const data = await res.json();
      setTestResults(data.results || []);
+     setShowTests(true);
    } catch (err) {
      alert("Error running tests: " + err.message);
    } finally {
@@ -1173,29 +1175,51 @@ const handleCliKeyPress = (e) => {
 
 
            {/* Test Results */}
-           {testResults.length > 0 && (
-            <div
-              style={{
-                maxHeight: "200px",
-                background: "#1e1e1e",
-                borderTop: "1px solid #3e3e42",
-                padding: "10px",
-                overflowY: "auto",
-              }}
-            >
-              {testResults.map((result, i) => (
-                <div key={i} style={{ marginBottom: "8px" }}>
-                  <div>Input: {result.input}</div>
-                  <div>Expected: {result.expectedOutput}</div>
-                  <div>Output: {result.actualOutput}</div>
-                  <div style={{ color: result.passed ? "lightgreen" : "tomato" }}>
-                    {result.passed ? "Passed ✅" : "Failed ❌"}
+            {testResults.length > 0 && showTests && (
+              <div
+                style={{
+                  maxHeight: "200px",
+                  background: "#1e1e1e",
+                  borderTop: "1px solid #3e3e42",
+                  padding: "10px",
+                  overflowY: "auto",
+                  position: "relative", // needed for absolute positioning of the X button
+                }}
+              >
+                {/* X button to close/minimize */}
+                <button
+                  onClick={() => setShowTests(false)}
+                  style={{
+                    position: "absolute",
+                    top: "10px",
+                    right: "15px",
+                    background: "#ff4444",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: "30px",
+                    height: "30px",
+                    cursor: "pointer",
+                    // fontWeight: "bold",   // makes the × thicker
+                    fontSize: "20px"
+                  }}
+                >
+                  ×
+                </button>
+
+                {testResults.map((result, i) => (
+                  <div key={i} style={{ marginBottom: "8px" }}>
+                    <div>Input: {result.input}</div>
+                    <div>Expected: {result.expectedOutput}</div>
+                    <div>Output: {result.actualOutput}</div>
+                    <div style={{ color: result.passed ? "lightgreen" : "tomato" }}>
+                      {result.passed ? "Passed ✅" : "Failed ❌"}
+                    </div>
+                    {result.stderr && <div style={{ color: "orange" }}>Error: {result.stderr}</div>}
                   </div>
-                  {result.stderr && <div style={{ color: "orange" }}>Error: {result.stderr}</div>}
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
          </div>
        </div>
      </div>
