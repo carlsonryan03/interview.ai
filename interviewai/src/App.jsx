@@ -719,19 +719,23 @@ const handleCliKeyPress = (e) => {
            ⏱️ {formatTime(timer)}
          </div>
        )}
-       <button
-          onClick={onLogout}
-          style={{
-            padding: "8px 16px",
-            background: "#ff4444",
-            color: "white",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-        >
-          Logout
-      </button>
+       {/* Only show logout button if not a guest */}
+        {!user?.isGuest && (
+          <button
+            onClick={onLogout}
+            style={{
+              padding: "8px 16px",
+              background: "#ff4444",
+              color: "white",
+              border: "none",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "14px",
+            }}
+          >
+            Logout
+          </button>
+        )}
      </header>
 
 

@@ -240,6 +240,31 @@ export default function Login({ onLoginSuccess }) {
             {loading ? "Please wait..." : isLogin ? "Login" : "Create Account"}
           </button>
         </form>
+
+        <div
+          style={{
+            marginTop: "20px",
+            textAlign: "center",
+            borderTop: "1px solid #3e3e42",
+            paddingTop: "20px",
+          }}
+        >
+          <button
+            onClick={() => onLoginSuccess({ username: "Guest", isGuest: true })}
+            style={{
+              padding: "10px 20px",
+              background: "transparent",
+              color: "#888",
+              border: "1px solid #555",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "14px",
+              width: "100%",
+            }}
+          >
+            Continue as Guest
+          </button>
+        </div>
       </div>
     </div>
   );
