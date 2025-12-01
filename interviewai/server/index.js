@@ -212,36 +212,45 @@ app.post('/api/run-tests', async (req, res) => {
     }
 
     const results = [];
-    
+
     for (const testCase of testCases) {
       const sourceBase64 = Buffer.from(source_code).toString('base64');
-      const stdinBase64 = testCase.input ? Buffer.from(testCase.input).toString('base64') : '';
 
+      // Ensure input and expectedOutput are strings
+      const input = testCase.input != null ? String(testCase.input) : '';
+      const expectedOutput = testCase.expectedOutput != null ? String(testCase.expectedOutput) : '';
+      const stdinBase64 = Buffer.from(input).toString('base64');
+
+      // Submit to Judge0 and wait for result
       const submitRes = await fetch(`${JUDGE0_URL}/submissions?base64_encoded=true&wait=true`, {
         method: 'POST',
         headers: buildHeaders(),
-        body: JSON.stringify({ 
-          source_code: sourceBase64, 
-          language_id, 
-          stdin: stdinBase64 
+        body: JSON.stringify({
+          source_code: sourceBase64,
+          language_id,
+          stdin: stdinBase64
         }),
       });
 
       if (!submitRes.ok) {
-        results.push({ passed: false, error: 'Submission failed' });
+        results.push({ passed: false, input, expectedOutput, actualOutput: null, error: 'Submission failed' });
         continue;
       }
 
       const result = await submitRes.json();
+
+      // Decode Judge0 outputs safely
       const stdout = result.stdout ? Buffer.from(result.stdout, 'base64').toString('utf-8').trim() : '';
-      const passed = stdout === testCase.expectedOutput.trim();
-      
+      const stderr = result.stderr ? Buffer.from(result.stderr, 'base64').toString('utf-8') : null;
+
+      const passed = stdout === expectedOutput.trim();
+
       results.push({
         passed,
-        input: testCase.input,
-        expectedOutput: testCase.expectedOutput,
+        input,
+        expectedOutput,
         actualOutput: stdout,
-        stderr: result.stderr ? Buffer.from(result.stderr, 'base64').toString('utf-8') : null
+        stderr,
       });
     }
 

@@ -1174,18 +1174,28 @@ const handleCliKeyPress = (e) => {
 
            {/* Test Results */}
            {testResults.length > 0 && (
-             <div
-               style={{
-                 maxHeight: "200px",
-                 background: "#1e1e1e",
-                 borderTop: "1px solid #3e3e42",
-                 padding: "10px",
-                 overflowY: "auto",
-               }}
-             >
-               {/* ... test results ... */}
-             </div>
-           )}
+            <div
+              style={{
+                maxHeight: "200px",
+                background: "#1e1e1e",
+                borderTop: "1px solid #3e3e42",
+                padding: "10px",
+                overflowY: "auto",
+              }}
+            >
+              {testResults.map((result, i) => (
+                <div key={i} style={{ marginBottom: "8px" }}>
+                  <div>Input: {result.input}</div>
+                  <div>Expected: {result.expectedOutput}</div>
+                  <div>Output: {result.actualOutput}</div>
+                  <div style={{ color: result.passed ? "lightgreen" : "tomato" }}>
+                    {result.passed ? "Passed ✅" : "Failed ❌"}
+                  </div>
+                  {result.stderr && <div style={{ color: "orange" }}>Error: {result.stderr}</div>}
+                </div>
+              ))}
+            </div>
+          )}
          </div>
        </div>
      </div>
