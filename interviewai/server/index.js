@@ -460,7 +460,8 @@ You are a technical interviewer creating a coding problem.
 - Generate a problem description for topic: ${topic || 'general'} and difficulty: ${difficulty || 'medium'}.
 - Include: problem statement, example input/output, and constraints.
 - STRICTLY DO NOT provide the solution, hints, or explanation.
-- Format as markdown with sections: **Question Title**, **Problem**, **Example**, **Constraints**.
+- Format as markdown with sections: **Question Title**, **Problem**, **Example**, **Constraints**, **Testing Format**.
+- Under **Testing Format**, specify how the solution will be tested (e.g.: Write your code as a solution function and, in if __name__ == '__main__', read input from stdin, call solution with that input, and print only the returned result.).
 
 After the problem, provide 3-5 test cases in the following JSON format:
 \`\`\`json
