@@ -108,25 +108,25 @@ function Dashboard({ onStartInterview, stats, onViewHistory }) {
           <StatCard 
             icon="🎯"
             title="Problems Solved"
-            value={stats.problemsSolved}
+            value={0}
             color="#4CAF50"
           />
           <StatCard 
             icon="⏱️"
             title="Total Time"
-            value={formatTime(stats.totalTime)}
+            value={formatTime(0)}
             color="#2196F3"
           />
           <StatCard 
             icon="✅"
             title="Tests Passed"
-            value={`${stats.testsPassed}/${stats.totalTests}`}
+            value={`${0}/${0}`}
             color="#FF9800"
           />
           <StatCard 
             icon="🔥"
             title="Current Streak"
-            value={`${stats.streak} days`}
+            value={`${0} days`}
             color="#f44336"
           />
         </div>
@@ -161,7 +161,7 @@ function Dashboard({ onStartInterview, stats, onViewHistory }) {
               e.target.style.boxShadow = "0 4px 15px rgba(0,0,0,0.2)";
             }}
           >
-            🚀 Start New Interview
+            Start New Interview
           </button>
           
           <button
@@ -828,7 +828,7 @@ if (!user) {
                 boxShadow: "0 2px 8px rgba(102, 126, 234, 0.4)",
               }}
             >
-              {loadingQuestion ? "Generating..." : "🎲 Generate New Question"}
+              {loadingQuestion ? "Generating..." : "Generate New Question"}
             </button>
           </div>
 

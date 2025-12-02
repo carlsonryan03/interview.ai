@@ -73,7 +73,7 @@ export default function Login({ onLoginSuccess }) {
             marginBottom: "30px",
           }}
         >
-          💻 AI Coding Interview
+          Interview.ai
         </h2>
 
         <div
