@@ -306,6 +306,12 @@ export default function App() {
   const [timerActive, setTimerActive] = useState(false);
   const [helpLevel, setHelpLevel] = useState("off");
   const [showTests, setShowTests] = useState(false);
+  const [showCLI, setShowCLI] = useState(false);
+  const [cliInput, setCliInput] = useState("");
+  const [terminalLines, setTerminalLines] = useState([]);
+  const [cliInputBuffer, setCliInputBuffer] = useState("");
+  const [cliToken, setCliToken] = useState(null);
+  const terminalRef = useRef(null);
   
 
   // Mock stats (replace with real data from backend)
@@ -362,10 +368,99 @@ export default function App() {
     loadLanguages();
   }, []);
 
+  // Auto-scroll terminal
+  useEffect(() => {
+    terminalRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [terminalLines]);
+
+  const appendLine = (text) => setTerminalLines((lines) => [...lines, text]);
+
+  const runCodeWithStdin = async (stdinLine = "") => {
+    if (!language) return;
+    setRunning(true);
+
+    // Add to input buffer
+    let updatedBuffer = cliInputBuffer;
+    if (stdinLine) updatedBuffer += stdinLine + "\n";
+    setCliInputBuffer(updatedBuffer);
+
+    try {
+      // Always submit fresh code
+      const submitRes = await fetch(`${API_URL}/api/submissions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_code: code,
+          language_id: language.id,
+          stdin: updatedBuffer,
+        }),
+      });
+      const json = await submitRes.json();
+      const token = json.token;
+      setCliToken(token);
+
+      let result = null;
+      for (let i = 0; i < 100; i++) {
+        const res = await fetch(`${API_URL}/api/submissions/${token}`);
+        if (!res.ok) continue;
+        const json = await res.json();
+        if (json.status?.id >= 3) {
+          result = json;
+          break;
+        }
+        await new Promise(r => setTimeout(r, 200));
+      }
+      if (!result) throw new Error("Timed out waiting for result");
+
+      if (stdinLine) appendLine(`> ${stdinLine}`);
+
+      const outputText =
+        decodeBase64Safe(result.stdout)?.trim() ||
+        decodeBase64Safe(result.compile_output)?.trim() ||
+        decodeBase64Safe(result.stderr)?.trim() ||
+        result.message ||
+        "";
+
+      const lines = outputText.split("\n");
+      lines.forEach(line => {
+        if (line.trim() !== stdinLine && !line.includes(stdinLine)) {
+          appendLine(line);
+        }
+      });
+
+      // Reset CLI state if finished
+      setCliInputBuffer("");
+      setCliToken(null);
+    } catch (err) {
+      appendLine("Error: " + (err.message || String(err)));
+      setCliToken(null);
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  const handleCliKeyPress = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      const inputLine = cliInput.trim();
+      if (!inputLine && !cliInputBuffer) return;
+      setCliInput("");
+      runCodeWithStdin(inputLine);
+    }
+  };
+
   const handleRunCode = async () => {
     if (!language) return;
     setRunning(true);
+    setTerminalLines([]);
     setOutput("");
+    setCliToken(null);
+
+    const stdin = showCLI ? cliInputBuffer || "" : "";
+
+    if (showCLI) {
+      appendLine("Running...");
+    }
 
     try {
       const submitRes = await fetch(`${API_URL}/api/submissions`, {
@@ -374,12 +469,14 @@ export default function App() {
         body: JSON.stringify({
           source_code: code,
           language_id: language.id,
-          stdin: ""
+          stdin: stdin
         }),
       });
 
       const json = await submitRes.json();
       const token = json.token;
+      if (!token) throw new Error("No token returned from backend");
+      setCliToken(token);
 
       let result = null;
       for (let i = 0; i < 40; i++) {
@@ -393,15 +490,29 @@ export default function App() {
         await new Promise(r => setTimeout(r, 500));
       }
 
+      if (!result) {
+        const errorMsg = "Error: Timed out waiting for backend to finish execution.";
+        if (showCLI) appendLine(errorMsg);
+        else setOutput(errorMsg);
+        return;
+      }
+
       const outputText =
         decodeBase64Safe(result?.stdout)?.trim() ||
+        decodeBase64Safe(result?.compile_output)?.trim() ||
         decodeBase64Safe(result?.stderr)?.trim() ||
         result?.message ||
-        "No output";
+        "";
 
-      setOutput(outputText);
+      if (showCLI) {
+        appendLine(outputText);
+      } else {
+        setOutput(outputText);
+      }
     } catch (err) {
-      setOutput("Error: " + err.message);
+      const errorMsg = "Error: " + err.message;
+      if (showCLI) appendLine(errorMsg);
+      else setOutput(errorMsg);
     } finally {
       setRunning(false);
     }
@@ -791,6 +902,22 @@ export default function App() {
               ))}
             </select>
 
+            <button
+              onClick={() => setShowCLI(!showCLI)}
+              style={{
+                padding: "10px 20px",
+                background: showCLI ? "#667eea" : "#3c3c3c",
+                color: "white",
+                border: "1px solid #555",
+                borderRadius: "8px",
+                cursor: "pointer",
+                fontWeight: "600",
+                fontSize: "14px",
+              }}
+            >
+              {showCLI ? "📟 CLI On" : "📟 CLI Off"}
+            </button>
+
             {questionData?.testCases && questionData.testCases.length > 0 && (
               <button
                 onClick={runTestCases}
@@ -852,33 +979,89 @@ export default function App() {
           </div>
 
           {/* Output Panel */}
-          <div style={{
-            height: "150px",
-            background: "#1e1e1e",
-            borderTop: "1px solid #3e3e42",
-            padding: "15px 20px",
-            overflowY: "auto",
-          }}>
-            <div style={{ 
-              color: "#888", 
-              fontSize: "11px", 
-              marginBottom: "8px",
-              fontWeight: "600",
-              textTransform: "uppercase",
-              letterSpacing: "0.08em",
-            }}>
-              Output:
-            </div>
-            <pre style={{
-              color: "#4CAF50",
-              fontSize: "13px",
-              margin: 0,
-              fontFamily: "monospace",
-              whiteSpace: "pre-wrap",
-            }}>
-              {output || "Click 'Run Code' to see output"}
-            </pre>
-          </div>
+            {showCLI ? (
+              // Terminal Mode
+              <div style={{
+                height: "200px",
+                display: "flex",
+                flexDirection: "column",
+                borderTop: "1px solid #3e3e42",
+                background: "#1e1e1e",
+              }}>
+                <div style={{
+                  padding: "10px 20px",
+                  fontWeight: "600",
+                  color: "#888",
+                  borderBottom: "1px solid #3e3e42",
+                  fontSize: "11px",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                }}>
+                  Terminal
+                </div>
+
+                <div style={{
+                  flex: 1,
+                  padding: "15px 20px",
+                  overflowY: "auto",
+                  color: "#4CAF50",
+                  fontFamily: "monospace",
+                  fontSize: "13px",
+                  background: "#1e1e1e",
+                }}>
+                  {terminalLines.map((line, i) => (
+                    <div key={i}>{line}</div>
+                  ))}
+                  <div ref={terminalRef} />
+                </div>
+
+                <input
+                  type="text"
+                  value={cliInput}
+                  onChange={(e) => setCliInput(e.target.value)}
+                  onKeyDown={handleCliKeyPress}
+                  placeholder='Click "Run Code" then type input and press Enter...'
+                  style={{
+                    padding: "12px 20px",
+                    border: "none",
+                    borderTop: "1px solid #3e3e42",
+                    background: "#1e1e1e",
+                    color: "#4CAF50",
+                    fontFamily: "monospace",
+                    fontSize: "13px",
+                  }}
+                />
+              </div>
+            ) : (
+              // Standard Output Mode
+              <div style={{
+                height: "100px",
+                background: "#1e1e1e",
+                borderTop: "1px solid #3e3e42",
+                padding: "15px 20px",
+                overflowY: "auto",
+              }}>
+                <div style={{ 
+                  color: "#888", 
+                  fontSize: "11px", 
+                  marginBottom: "8px",
+                  fontWeight: "600",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.08em",
+                }}>
+                  Output:
+                </div>
+                <pre style={{
+                  color: "#4CAF50",
+                  fontSize: "13px",
+                  margin: 0,
+                  fontFamily: "monospace",
+                  whiteSpace: "pre-wrap",
+                }}>
+                  {output || "Click 'Run Code' to see output"}
+                </pre>
+              </div>
+            )}
           {testResults.length > 0 && showTests && (
             <div style={{
               maxHeight: "200px",
