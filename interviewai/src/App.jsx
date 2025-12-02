@@ -306,6 +306,7 @@ export default function App() {
   const [timerActive, setTimerActive] = useState(false);
   const [helpLevel, setHelpLevel] = useState("off");
   const [showTests, setShowTests] = useState(false);
+  
 
   // Mock stats (replace with real data from backend)
   const [stats] = useState({
@@ -403,6 +404,36 @@ export default function App() {
       setOutput("Error: " + err.message);
     } finally {
       setRunning(false);
+    }
+  };
+
+  const runTestCases = async () => {
+    if (!questionData?.testCases || questionData.testCases.length === 0) {
+      alert("No test cases available");
+      return;
+    }
+
+    setRunningTests(true);
+    setTestResults([]);
+
+    try {
+      const res = await fetch(`${API_URL}/api/run-tests`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_code: code,
+          language_id: language.id,
+          testCases: questionData.testCases,
+        }),
+      });
+
+      const data = await res.json();
+      setTestResults(data.results || []);
+      setShowTests(true);
+    } catch (err) {
+      alert("Error running tests: " + err.message);
+    } finally {
+      setRunningTests(false);
     }
   };
 
@@ -598,7 +629,7 @@ export default function App() {
                   }}
                 >
                   <option value="off">Off</option>
-                  <option value="hard">Minimal</option>
+                  <option value="hard">`Minim`al</option>
                   <option value="medium">Moderate</option>
                   <option value="easy">Maximum</option>
                 </select>
@@ -760,6 +791,26 @@ export default function App() {
               ))}
             </select>
 
+            {questionData?.testCases && questionData.testCases.length > 0 && (
+              <button
+                onClick={runTestCases}
+                disabled={runningTests}
+                style={{
+                  padding: "10px 24px",
+                  background: runningTests ? "#555" : "#ff9800",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  cursor: runningTests ? "not-allowed" : "pointer",
+                  fontWeight: "600",
+                  fontSize: "14px",
+                  boxShadow: runningTests ? "none" : "0 2px 8px rgba(255, 152, 0, 0.4)",
+                }}
+              >
+                {runningTests ? "Testing..." : `🧪 Run Tests (${questionData.testCases.length})`}
+              </button>
+            )}
+
             <button
               onClick={handleRunCode}
               disabled={running || !language}
@@ -828,6 +879,79 @@ export default function App() {
               {output || "Click 'Run Code' to see output"}
             </pre>
           </div>
+          {testResults.length > 0 && showTests && (
+            <div style={{
+              maxHeight: "200px",
+              background: "#1e1e1e",
+              borderTop: "1px solid #3e3e42",
+              padding: "15px 20px",
+              overflowY: "auto",
+              position: "relative",
+            }}>
+              <button
+                onClick={() => setShowTests(false)}
+                style={{
+                  position: "absolute",
+                  top: "5px",
+                  right: "15px",
+                  background: "#ff4444",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "50%",
+                  width: "30px",
+                  height: "30px",
+                  cursor: "pointer",
+                  fontSize: "20px",
+                  fontWeight: "bold",
+                }}
+              >
+                ×
+              </button>
+
+              <div style={{ 
+                color: "#888", 
+                fontSize: "11px", 
+                marginBottom: "12px",
+                fontWeight: "600",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+              }}>
+                Test Results:
+              </div>
+
+              {testResults.map((result, i) => (
+                <div key={i} style={{ 
+                  marginBottom: "12px",
+                  padding: "12px",
+                  background: "#2d2d30",
+                  borderRadius: "8px",
+                  borderLeft: `4px solid ${result.passed ? "#4CAF50" : "#f44336"}`,
+                }}>
+                  <div style={{ fontSize: "13px", marginBottom: "4px", color: "#aaa" }}>
+                    <strong>Input:</strong> {result.input}
+                  </div>
+                  <div style={{ fontSize: "13px", marginBottom: "4px", color: "#aaa" }}>
+                    <strong>Expected:</strong> {result.expectedOutput}
+                  </div>
+                  <div style={{ fontSize: "13px", marginBottom: "4px", color: "#aaa" }}>
+                    <strong>Output:</strong> {result.actualOutput}
+                  </div>
+                  <div style={{ 
+                    color: result.passed ? "#4CAF50" : "#f44336",
+                    fontWeight: "600",
+                    fontSize: "14px",
+                  }}>
+                    {result.passed ? "Passed ✅" : "Failed ❌"}
+                  </div>
+                  {result.stderr && (
+                    <div style={{ color: "#ff9800", fontSize: "12px", marginTop: "4px" }}>
+                      <strong>Error:</strong> {result.stderr}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
