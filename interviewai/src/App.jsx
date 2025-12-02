@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import Editor from "@monaco-editor/react";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
+import Login from "./Login";
 
 const API_URL = "http://localhost:3001";
 
@@ -287,6 +288,8 @@ function FeatureCard({ icon, title, description }) {
 
 // Main App Component
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [loadingUser, setLoadingUser] = useState(true);
   const [showDashboard, setShowDashboard] = useState(true);
   const [languages, setLanguages] = useState([]);
   const [language, setLanguage] = useState(null);
@@ -333,6 +336,12 @@ export default function App() {
   }, [messages]);
 
   useEffect(() => {
+  if (user?.isGuest) {
+    setShowDashboard(false);
+  }
+}, [user]);
+
+  useEffect(() => {
   if (!timerRunning) return;
 
   const interval = setInterval(() => {
@@ -342,6 +351,12 @@ export default function App() {
   return () => clearInterval(interval);
 }, [timerRunning]);
 
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+  }, []);
 
   useEffect(() => {
     async function loadLanguages() {
@@ -605,6 +620,16 @@ export default function App() {
       setSending(false);
     }
   };
+
+  // 2. No user → go to login page
+if (!user) {
+  return <Login
+      onLoginSuccess={(userData) => {
+        setUser(userData);
+        localStorage.setItem("user", JSON.stringify(userData));
+      }}
+    />;
+}
 
   if (showDashboard) {
     return (
