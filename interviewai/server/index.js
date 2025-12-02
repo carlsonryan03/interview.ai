@@ -39,9 +39,16 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok', message: 'Server i
 // Judge0: submit code
 app.post('/api/submissions', async (req, res) => {
   try {
-    const { source_code, language_id, stdin } = req.body;
+    console.log("=== BACKEND DEBUG ===");
+    console.log("📥 Full request body:", JSON.stringify(req.body, null, 2));
     
-    console.log('📝 Submission request received:', { language_id, code_length: source_code?.length });
+    const { source_code, language_id, stdin, command_line_arguments } = req.body;
+    
+    console.log('📝 Extracted values:');
+    console.log('  - source_code length:', source_code?.length);
+    console.log('  - language_id:', language_id);
+    console.log('  - stdin:', stdin);
+    console.log('  - command_line_arguments:', command_line_arguments);
     
     if (!source_code || !language_id) {
       console.error('❌ Missing required fields');
@@ -62,14 +69,24 @@ app.post('/api/submissions', async (req, res) => {
     console.log('🔄 Submitting to Judge0:', url);
     console.log('🔑 Headers:', Object.keys(headers));
 
+    const submissionBody = { 
+      source_code: sourceBase64, 
+      language_id, 
+      stdin: stdinBase64 
+    };
+
+    // Add command line arguments if provided
+    if (command_line_arguments) {
+      submissionBody.command_line_arguments = command_line_arguments;
+      console.log('📌 Command line arguments:', command_line_arguments);
+    }
+
+    console.log('📦 Submission body keys:', Object.keys(submissionBody));
+
     const submitRes = await fetch(url, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ 
-        source_code: sourceBase64, 
-        language_id, 
-        stdin: stdinBase64 
-      }),
+      body: JSON.stringify(submissionBody),
     });
 
     console.log('📡 Judge0 response status:', submitRes.status);
