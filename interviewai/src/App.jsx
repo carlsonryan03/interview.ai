@@ -5,6 +5,22 @@ import rehypeRaw from "rehype-raw";
 
 const API_URL = "http://localhost:3001";
 
+// Import modern fonts
+const fontStyles = `
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  
+  * {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  }
+`;
+
+// Inject font styles
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement("style");
+  styleSheet.innerText = fontStyles;
+  document.head.appendChild(styleSheet);
+}
+
 // Starter code templates
 const getStarterCode = (languageName = "") => {
   const lower = (languageName || "").toLowerCase();
@@ -64,14 +80,18 @@ function Dashboard({ onStartInterview, stats, onViewHistory }) {
             color: "white",
             margin: "0 0 20px 0",
             textShadow: "0 4px 6px rgba(0,0,0,0.2)",
+            letterSpacing: "-0.02em",
           }}>
             💻 AI Coding Interview
           </h1>
           <p style={{
             fontSize: "20px",
+            fontWeight: "400",
             color: "rgba(255,255,255,0.9)",
             maxWidth: "600px",
             margin: "0 auto",
+            letterSpacing: "-0.01em",
+            lineHeight: "1.5",
           }}>
             Practice coding interviews with AI-powered feedback and real-time assistance
           </p>
@@ -210,10 +230,22 @@ function StatCard({ icon, title, value, color }) {
     onMouseOut={(e) => e.currentTarget.style.transform = "translateY(0)"}
     >
       <div style={{ fontSize: "48px", marginBottom: "10px" }}>{icon}</div>
-      <div style={{ fontSize: "14px", color: "#666", marginBottom: "8px", fontWeight: "500" }}>
+      <div style={{ 
+        fontSize: "13px", 
+        color: "#666", 
+        marginBottom: "8px", 
+        fontWeight: "600",
+        textTransform: "uppercase",
+        letterSpacing: "0.05em",
+      }}>
         {title}
       </div>
-      <div style={{ fontSize: "32px", fontWeight: "700", color }}>
+      <div style={{ 
+        fontSize: "32px", 
+        fontWeight: "700", 
+        color,
+        letterSpacing: "-0.02em",
+      }}>
         {value}
       </div>
     </div>
@@ -231,10 +263,22 @@ function FeatureCard({ icon, title, description }) {
       textAlign: "center",
     }}>
       <div style={{ fontSize: "48px", marginBottom: "15px" }}>{icon}</div>
-      <h3 style={{ fontSize: "20px", fontWeight: "600", color: "white", margin: "0 0 10px 0" }}>
+      <h3 style={{ 
+        fontSize: "20px", 
+        fontWeight: "600", 
+        color: "white", 
+        margin: "0 0 10px 0",
+        letterSpacing: "-0.01em",
+      }}>
         {title}
       </h3>
-      <p style={{ fontSize: "14px", color: "rgba(255,255,255,0.8)", margin: 0 }}>
+      <p style={{ 
+        fontSize: "14px", 
+        fontWeight: "400",
+        color: "rgba(255,255,255,0.8)", 
+        margin: 0,
+        lineHeight: "1.5",
+      }}>
         {description}
       </p>
     </div>
@@ -460,7 +504,7 @@ export default function App() {
           >
             ← Dashboard
           </button>
-          <h2 style={{ margin: 0, fontSize: "24px", fontWeight: "700" }}>💻 AI Coding Interview</h2>
+          <h2 style={{ margin: 0, fontSize: "24px", fontWeight: "700", letterSpacing: "-0.01em" }}>💻 AI Coding Interview</h2>
         </div>
         {timerActive && (
           <div style={{
@@ -766,10 +810,11 @@ export default function App() {
           }}>
             <div style={{ 
               color: "#888", 
-              fontSize: "12px", 
+              fontSize: "11px", 
               marginBottom: "8px",
               fontWeight: "600",
               textTransform: "uppercase",
+              letterSpacing: "0.08em",
             }}>
               Output:
             </div>
