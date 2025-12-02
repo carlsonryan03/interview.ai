@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import Editor from "@monaco-editor/react";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
+import Login from "./Login";
 
 const API_URL = "http://localhost:3001";
 
@@ -82,7 +83,7 @@ function Dashboard({ onStartInterview, stats, onViewHistory }) {
             textShadow: "0 4px 6px rgba(0,0,0,0.2)",
             letterSpacing: "-0.02em",
           }}>
-            💻 AI Coding Interview
+            Interview.ai
           </h1>
           <p style={{
             fontSize: "20px",
@@ -287,6 +288,8 @@ function FeatureCard({ icon, title, description }) {
 
 // Main App Component
 export default function App() {
+  const [user, setUser] = useState(null);
+  const [loadingUser, setLoadingUser] = useState(true);
   const [showDashboard, setShowDashboard] = useState(true);
   const [languages, setLanguages] = useState([]);
   const [language, setLanguage] = useState(null);
@@ -303,6 +306,7 @@ export default function App() {
   const [testResults, setTestResults] = useState([]);
   const [runningTests, setRunningTests] = useState(false);
   const [timer, setTimer] = useState(0);
+  const [timerRunning, setTimerRunning] = useState(false);
   const [timerActive, setTimerActive] = useState(false);
   const [helpLevel, setHelpLevel] = useState("off");
   const [showTests, setShowTests] = useState(false);
@@ -327,14 +331,27 @@ export default function App() {
   }, [messages]);
 
   useEffect(() => {
-    let interval;
-    if (timerActive) {
-      interval = setInterval(() => {
-        setTimer(prev => prev + 1);
-      }, 1000);
+  if (user?.isGuest) {
+    setShowDashboard(false);
+  }
+}, [user]);
+
+  useEffect(() => {
+  if (!timerRunning) return;
+
+  const interval = setInterval(() => {
+    setTimer(prev => prev + 1);
+  }, 1000);
+
+  return () => clearInterval(interval);
+}, [timerRunning]);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
     }
-    return () => clearInterval(interval);
-  }, [timerActive]);
+  }, []);
 
   useEffect(() => {
     async function loadLanguages() {
@@ -452,7 +469,8 @@ export default function App() {
   const generateQuestion = async () => {
     setLoadingQuestion(true);
     setTimer(0);
-    setTimerActive(false);
+    // setTimerActive(false);
+    setTimerRunning(true);
     setTestResults([]);
 
     try {
@@ -504,6 +522,16 @@ export default function App() {
     }
   };
 
+  // 2. No user → go to login page
+if (!user) {
+  return <Login
+      onLoginSuccess={(userData) => {
+        setUser(userData);
+        localStorage.setItem("user", JSON.stringify(userData));
+      }}
+    />;
+}
+
   if (showDashboard) {
     return (
       <Dashboard 
@@ -523,43 +551,111 @@ export default function App() {
       overflow: "hidden",
     }}>
       {/* Enhanced Header */}
-      <header style={{
-        padding: "15px 30px",
-        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+      <header
+  style={{
+    padding: "15px 30px",
+    background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+    color: "white",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
+  }}
+>
+  {/* LEFT SIDE */}
+  <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+    <button
+      onClick={() => setShowDashboard(true)}
+      style={{
+        background: "rgba(255,255,255,0.2)",
+        border: "none",
         color: "white",
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-          <button
-            onClick={() => setShowDashboard(true)}
-            style={{
-              background: "rgba(255,255,255,0.2)",
-              border: "none",
-              color: "white",
-              padding: "8px 16px",
-              borderRadius: "8px",
-              cursor: "pointer",
-              fontSize: "14px",
-            }}
-          >
-            ← Dashboard
-          </button>
-          <h2 style={{ margin: 0, fontSize: "24px", fontWeight: "700", letterSpacing: "-0.01em" }}>💻 AI Coding Interview</h2>
-        </div>
-        {timerActive && (
-          <div style={{
-            fontSize: "28px",
-            fontWeight: "bold",
-            color: timer > 1800 ? "#ffeb3b" : "white",
-            textShadow: "0 2px 4px rgba(0,0,0,0.3)",
-          }}>
-            ⏱️ {formatTime(timer)}
-          </div>
-        )}
-      </header>
+        padding: "8px 16px",
+        borderRadius: "8px",
+        cursor: "pointer",
+        fontSize: "14px",
+      }}
+    >
+      ← Dashboard
+    </button>
+
+    <h2
+      style={{
+        margin: 0,
+        fontSize: "24px",
+        fontWeight: "700",
+        letterSpacing: "-0.01em",
+      }}
+    >
+      Interview.ai
+    </h2>
+  </div>
+
+  {/* RIGHT SIDE */}
+  <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
+    {timerActive && (
+      <div
+        style={{
+          fontSize: "28px",
+          fontWeight: "bold",
+          color: timer > 1800 ? "#ffeb3b" : "white",
+          textShadow: "0 2px 4px rgba(0,0,0,0.3)",
+        }}
+      >
+        ⏱️ {formatTime(timer)}
+      </div>
+    )}
+
+    {/* SLIDER TOGGLE */}
+    <label
+      style={{
+        position: "relative",
+        display: "inline-block",
+        width: "50px",
+        height: "24px",
+        cursor: "pointer",
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={timerActive}
+        onChange={() => setTimerActive(!timerActive)}
+        style={{ display: "none" }}
+      />
+
+      <span
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: timerActive
+            ? "rgba(255,255,255,0.5)"
+            : "rgba(255,255,255,0.2)",
+          borderRadius: "24px",
+          transition: "0.3s",
+        }}
+      />
+
+      <span
+        style={{
+          position: "absolute",
+          height: "20px",
+          width: "20px",
+          left: timerActive ? "28px" : "4px",
+          bottom: "2px",
+          backgroundColor: "white",
+          borderRadius: "50%",
+          transition: "0.3s",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.3)",
+        }}
+      />
+    </label>
+  </div>
+</header>
+
+
 
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* Left Panel - Enhanced */}
@@ -819,7 +915,7 @@ export default function App() {
                   boxShadow: runningTests ? "none" : "0 2px 8px rgba(255, 152, 0, 0.4)",
                 }}
               >
-                {runningTests ? "Testing..." : `🧪 Run Tests (${questionData.testCases.length})`}
+                {runningTests ? "Testing..." : `Run Tests (${questionData.testCases.length})`}
               </button>
             )}
 
