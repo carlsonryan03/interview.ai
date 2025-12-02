@@ -286,6 +286,25 @@ function FeatureCard({ icon, title, description }) {
   );
 }
 
+// Check if two strings are similar (simple word overlap check)
+function areSimilar(str1, str2, threshold = 0.6) {
+  if (!str1 || !str2) return false;
+  
+  const words1 = str1.toLowerCase().match(/\w+/g) || [];
+  const words2 = str2.toLowerCase().match(/\w+/g) || [];
+  
+  if (words1.length === 0 || words2.length === 0) return false;
+  
+  const set1 = new Set(words1);
+  const set2 = new Set(words2);
+  
+  const intersection = new Set([...set1].filter(x => set2.has(x)));
+  const union = new Set([...set1, ...set2]);
+  
+  const similarity = intersection.size / union.size;
+  return similarity >= threshold;
+}
+
 // Main App Component
 export default function App() {
   const [user, setUser] = useState(null);
@@ -311,7 +330,9 @@ export default function App() {
   const [helpLevel, setHelpLevel] = useState("off");
   const [showTests, setShowTests] = useState(false);
   const [commandLineArgs, setCommandLineArgs] = useState("");
-  
+  const [loadingAutoFeedback, setLoadingAutoFeedback] = useState(false);  
+  const [lastAutoFeedback, setLastAutoFeedback] = useState("");
+  const [lastAnalyzedCode, setLastAnalyzedCode] = useState("");
 
   // Mock stats (replace with real data from backend)
   const [stats] = useState({
@@ -380,6 +401,52 @@ export default function App() {
     loadLanguages();
   }, []);
 
+  // Auto-feedback when user stops typing
+  useEffect(() => {
+    console.log("🔍 Auto-feedback check - Help Level:", helpLevel);
+
+    if (helpLevel === "off" || !code || code.trim().length < 20 || messages.length === 0) {
+      return;
+    }
+
+    // Don't re-analyze if code hasn't changed significantly
+    const codeChanged = code !== lastAnalyzedCode;
+    if (!codeChanged) return;
+
+    const timer = setTimeout(async () => {
+      setLoadingAutoFeedback(true);
+      try {
+        const res = await fetch(`${API_URL}/api/auto-feedback`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code,
+            conversation: messages.map(m => m.content).join("\n"),
+            language: language?.name,
+            helpLevel: helpLevel,
+          }),
+        });
+        const data = await res.json();
+        
+        // Check if the new suggestion is similar to the last one
+        if (data.suggestion && !areSimilar(data.suggestion, lastAutoFeedback)) {
+          setMessages(prev => [
+            ...prev,
+            { role: "assistant", content: `💡 **Auto-suggestion:** ${data.suggestion}`, isAutoFeedback: true }
+          ]);
+          setLastAutoFeedback(data.suggestion);
+        }
+        
+        setLastAnalyzedCode(code);
+      } catch (err) {
+        console.error("Auto-feedback error:", err);
+      } finally {
+        setLoadingAutoFeedback(false);
+      }
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [code, helpLevel, language?.name, lastAnalyzedCode, lastAutoFeedback]);
 
   const handleRunCode = async () => {
     if (!language) return;
@@ -469,9 +536,10 @@ export default function App() {
   const generateQuestion = async () => {
     setLoadingQuestion(true);
     setTimer(0);
-    // setTimerActive(false);
     setTimerRunning(true);
     setTestResults([]);
+    setLastAutoFeedback("");  // Add this line
+    setLastAnalyzedCode("");  // Add this line
 
     try {
       const res = await fetch(`${API_URL}/api/generate-question`, {

@@ -66,7 +66,7 @@ app.post('/api/submissions', async (req, res) => {
     const url = `${JUDGE0_URL}/submissions?base64_encoded=true&wait=false`;
     const headers = buildHeaders();
     
-    console.log('🔄 Submitting to Judge0:', url);
+    console.log('📤 Submitting to Judge0:', url);
     console.log('🔑 Headers:', Object.keys(headers));
 
     const submissionBody = { 
@@ -78,7 +78,7 @@ app.post('/api/submissions', async (req, res) => {
     // Add command line arguments if provided
     if (command_line_arguments) {
       submissionBody.command_line_arguments = command_line_arguments;
-      console.log('📌 Command line arguments:', command_line_arguments);
+      console.log('🔌 Command line arguments:', command_line_arguments);
     }
 
     console.log('📦 Submission body keys:', Object.keys(submissionBody));
@@ -138,48 +138,89 @@ app.get('/api/submissions/:token', async (req, res) => {
   }
 });
 
-export async function generateFeedback(code, conversation) {
-  console.log("Grok API key inside generateFeedback:", process.env.OPENAI_API_KEY);
-
+app.post("/api/auto-feedback", async (req, res) => {
   try {
-    // If conversation contains objects, map them to strings
-    const convoText = conversation
-      .map(msg => (typeof msg === 'string' ? msg : `${msg.role}: ${msg.content}`))
-      .join("\n");
+    const { code, conversation, language, helpLevel = "medium" } = req.body;  // ✅ Extract helpLevel
+    
+    if (!code) {
+      return res.status(400).json({ error: 'Code is required' });
+    }
 
-    const prompt = `
-You are an AI co-programmer. The user has written the following code:
+    if (!process.env.GROQ_API_KEY) {
+      return res.status(500).json({ error: 'Groq API key not configured' });
+    }
+
+    // Build conversation context
+    const convoText = Array.isArray(conversation)
+      ? conversation
+          .map(msg => (typeof msg === 'string' ? msg : `${msg.role}: ${msg.content}`))
+          .join("\n")
+      : '';
+
+    // ✅ Adjust instructions based on help level
+    const helpInstructions = {
+      easy: 'Provide 2-3 sentences with detailed suggestions and explanations. Be very helpful.',
+      medium: 'Provide 1-2 sentences with balanced hints without giving away the solution.',
+      hard: 'Provide EXACTLY 1 sentence with a minimal, subtle hint only.',
+      off: 'Do not provide feedback.',
+    };
+
+    const instruction = helpInstructions[helpLevel] || helpInstructions.medium;
+
+    const prompt = `You are an AI coding assistant providing automatic feedback as the user codes.
+
+Current code (${language || 'unknown language'}):
+\`\`\`
 ${code}
+\`\`\`
 
-The conversation so far is:
-${convoText}
+Recent conversation:
+${convoText || 'No previous conversation'}
 
-Provide a concise suggestion or helpful feedback for the user.
-`;
+Help Level: ${instruction}
 
-    const response = await axios.post(
-      "https://api.openai.com/v1/responses",
-      { model: "grok-1", input: prompt },
-      { headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+Provide BRIEF, proactive feedback about:
+- Potential bugs or syntax issues you notice
+- Code quality improvements
+- Logic errors or edge cases they might be missing
+- Better approaches to consider
+
+${helpLevel === 'hard' ? 'Keep your response to EXACTLY 1 sentence.' 
+  : helpLevel === 'medium' ? 'Keep your response to 1-2 sentences maximum.' 
+  : 'Keep your response to 2-3 sentences maximum.'}
+
+Keep it concise, encouraging, and actionable. Don't rewrite their code.`;
+
+    const completion = await groq.chat.completions.create({
+      messages: [
+        { 
+          role: 'system', 
+          content: `You are a helpful coding assistant. ${instruction} Always stay within the sentence limit.`  // ✅ Add instruction to system
         },
-      }
-    );
+        { role: 'user', content: prompt }
+      ],
+      model: 'llama-3.3-70b-versatile',
+      temperature: 0.7,
+      max_tokens: helpLevel === 'hard' ? 50 : helpLevel === 'medium' ? 100 : 150,  // ✅ Adjust token limits
+    });
 
-    console.log('OPENAI_API_KEY:', process.env.OPENAI_API_KEY);
+    const suggestion = completion.choices[0]?.message?.content || 'Keep going! Looking good so far.';
+    
+    console.log(`✅ Auto-feedback generated (${helpLevel} level):`, suggestion.substring(0, 50) + '...');
 
-    console.log("Grok response:", response.data);
-
-    return response.data.output_text || "No suggestion available";
+    res.json({ suggestion });
+    
   } catch (err) {
-    console.error("Full error generating feedback:", err.response?.data || err.message);
-    throw err;
+    console.error('❌ Auto-feedback Error:', err.message);
+    res.status(500).json({ error: 'Failed to get auto-feedback' });
   }
-}
+});
 
-// In index.js - update the /api/ai-feedback endpoint
+// Manual AI feedback with help level control
 app.post("/api/ai-feedback", async (req, res) => {
+
+  console.log("/api/ai-feedback");
+
   try {
     const { code, conversation, language, helpLevel = "medium" } = req.body;
     
@@ -228,7 +269,7 @@ IMPORTANT: ${helpLevel === 'hard' ? 'Keep your response to EXACTLY 1 sentence an
       ],
       model: 'llama-3.3-70b-versatile',
       temperature: 0.7,
-      max_tokens: 500, // Increased to allow full responses without cutoff
+      max_tokens: 500,
     });
 
     const suggestion = completion.choices[0]?.message?.content || 'Looking good so far!';
@@ -322,8 +363,7 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// Replace the /api/run-tests endpoint in index-1.js with this:
-
+// Run test cases
 app.post('/api/run-tests', async (req, res) => {
   try {
     const { source_code, language_id, testCases } = req.body;
@@ -337,7 +377,7 @@ app.post('/api/run-tests', async (req, res) => {
 
     for (let i = 0; i < testCases.length; i++) {
       const testCase = testCases[i];
-      console.log(`\n📝 Test ${i + 1}:`, testCase);
+      console.log(`\n🔍 Test ${i + 1}:`, testCase);
       
       const sourceBase64 = Buffer.from(source_code).toString('base64');
 
