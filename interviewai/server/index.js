@@ -322,7 +322,8 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-// Run test cases
+// Replace the /api/run-tests endpoint in index-1.js with this:
+
 app.post('/api/run-tests', async (req, res) => {
   try {
     const { source_code, language_id, testCases } = req.body;
@@ -331,15 +332,22 @@ app.post('/api/run-tests', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    console.log(`🧪 Running ${testCases.length} test cases...`);
     const results = [];
 
-    for (const testCase of testCases) {
+    for (let i = 0; i < testCases.length; i++) {
+      const testCase = testCases[i];
+      console.log(`\n📝 Test ${i + 1}:`, testCase);
+      
       const sourceBase64 = Buffer.from(source_code).toString('base64');
 
       // Ensure input and expectedOutput are strings
       const input = testCase.input != null ? String(testCase.input) : '';
       const expectedOutput = testCase.expectedOutput != null ? String(testCase.expectedOutput) : '';
-      const stdinBase64 = Buffer.from(input).toString('base64');
+      const stdinBase64 = input ? Buffer.from(input).toString('base64') : '';
+
+      console.log(`  Input: "${input}"`);
+      console.log(`  Expected: "${expectedOutput}"`);
 
       // Submit to Judge0 and wait for result
       const submitRes = await fetch(`${JUDGE0_URL}/submissions?base64_encoded=true&wait=true`, {
@@ -353,27 +361,46 @@ app.post('/api/run-tests', async (req, res) => {
       });
 
       if (!submitRes.ok) {
-        results.push({ passed: false, input, expectedOutput, actualOutput: null, error: 'Submission failed' });
+        const errorText = await submitRes.text();
+        console.error(`  ❌ Submission failed:`, errorText);
+        results.push({ 
+          passed: false, 
+          input, 
+          expectedOutput, 
+          actualOutput: null, 
+          error: `Submission failed: ${errorText}` 
+        });
         continue;
       }
 
       const result = await submitRes.json();
+      console.log(`  Judge0 status:`, result.status);
 
-      // Decode Judge0 outputs safely
+      // Decode all possible outputs
       const stdout = result.stdout ? Buffer.from(result.stdout, 'base64').toString('utf-8').trim() : '';
-      const stderr = result.stderr ? Buffer.from(result.stderr, 'base64').toString('utf-8') : null;
+      const stderr = result.stderr ? Buffer.from(result.stderr, 'base64').toString('utf-8').trim() : '';
+      const compile_output = result.compile_output ? Buffer.from(result.compile_output, 'base64').toString('utf-8').trim() : '';
+      const message = result.message || '';
+
+      console.log(`  Stdout: "${stdout}"`);
+      console.log(`  Stderr: "${stderr}"`);
+      console.log(`  Compile output: "${compile_output}"`);
+      console.log(`  Message: "${message}"`);
 
       const passed = stdout === expectedOutput.trim();
+      console.log(`  ${passed ? '✅' : '❌'} Result: ${passed ? 'PASSED' : 'FAILED'}`);
 
       results.push({
         passed,
         input,
         expectedOutput,
-        actualOutput: stdout,
-        stderr,
+        actualOutput: stdout || null,
+        stderr: stderr || compile_output || message || null,
+        status: result.status
       });
     }
 
+    console.log(`\n✅ Test run complete: ${results.filter(r => r.passed).length}/${results.length} passed`);
     res.json({ results });
   } catch (err) {
     console.error('❌ Test run error:', err.message);

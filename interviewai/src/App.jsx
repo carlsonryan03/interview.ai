@@ -961,13 +961,13 @@ if (!user) {
 
           {/* Output Panel */}
           <div style={{
-            height: "150px",
+            height: "250px",
             display: "flex",
             flexDirection: "column",
             borderTop: "1px solid #3e3e42",
             background: "#1e1e1e",
           }}>
-            {/* Command Line Args Input */}
+            {/* Tab Bar */}
             <div style={{
               padding: "8px 20px",
               background: "#2d2d30",
@@ -976,65 +976,170 @@ if (!user) {
               alignItems: "center",
               gap: "10px",
             }}>
-              <label style={{ 
-                color: "#888", 
-                fontSize: "11px",
-                fontWeight: "600",
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                whiteSpace: "nowrap",
-              }}>
-                Arguments:
-              </label>
-              <input
-                type="text"
-                value={commandLineArgs}
-                onChange={(e) => setCommandLineArgs(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !running) {
-                    handleRunCode();
-                  }
-                }}
-                placeholder='e.g., arg1 arg2 "quoted arg" (press Enter to run)'
+              <button
+                onClick={() => setShowTests(false)}
                 style={{
-                  flex: 1,
-                  padding: "8px 12px",
-                  background: "#3c3c3c",
-                  color: "#4CAF50",
-                  border: "1px solid #555",
+                  padding: "8px 16px",
+                  background: !showTests ? "#3c3c3c" : "transparent",
+                  color: !showTests ? "white" : "#888",
+                  border: "none",
                   borderRadius: "6px",
-                  fontSize: "13px",
-                  fontFamily: "monospace",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  fontWeight: "600",
                 }}
-              />
+              >
+                Output
+              </button>
+              {testResults.length > 0 && (
+                <button
+                  onClick={() => setShowTests(true)}
+                  style={{
+                    padding: "8px 16px",
+                    background: showTests ? "#3c3c3c" : "transparent",
+                    color: showTests ? "white" : "#888",
+                    border: "none",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                  }}
+                >
+                  Test Results ({testResults.filter(t => t.passed).length}/{testResults.length} passed)
+                </button>
+              )}
             </div>
 
-            {/* Output Display */}
-            <div style={{
-              flex: 1,
-              padding: "15px 20px",
-              overflowY: "auto",
-            }}>
-              <div style={{ 
-                color: "#888", 
-                fontSize: "11px", 
-                marginBottom: "8px",
-                fontWeight: "600",
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
+            {!showTests ? (
+              <>
+                {/* Command Line Args Input */}
+                <div style={{
+                  padding: "8px 20px",
+                  background: "#2d2d30",
+                  borderBottom: "1px solid #3e3e42",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "10px",
+                }}>
+                  <label style={{ 
+                    color: "#888", 
+                    fontSize: "11px",
+                    fontWeight: "600",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                    whiteSpace: "nowrap",
+                  }}>
+                    Arguments:
+                  </label>
+                  <input
+                    type="text"
+                    value={commandLineArgs}
+                    onChange={(e) => setCommandLineArgs(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !running) {
+                        handleRunCode();
+                      }
+                    }}
+                    placeholder='e.g., arg1 arg2 "quoted arg" (press Enter to run)'
+                    style={{
+                      flex: 1,
+                      padding: "8px 12px",
+                      background: "#3c3c3c",
+                      color: "#4CAF50",
+                      border: "1px solid #555",
+                      borderRadius: "6px",
+                      fontSize: "13px",
+                      fontFamily: "monospace",
+                    }}
+                  />
+                </div>
+
+                {/* Output Display */}
+                <div style={{
+                  flex: 1,
+                  padding: "15px 20px",
+                  overflowY: "auto",
+                }}>
+                  <div style={{ 
+                    color: "#888", 
+                    fontSize: "11px", 
+                    marginBottom: "8px",
+                    fontWeight: "600",
+                    textTransform: "uppercase",
+                    letterSpacing: "0.08em",
+                  }}>
+                    Output:
+                  </div>
+                  <pre style={{
+                    color: "#4CAF50",
+                    fontSize: "13px",
+                    margin: 0,
+                    fontFamily: "monospace",
+                    whiteSpace: "pre-wrap",
+                  }}>
+                    {output || "Click 'Run Code' to see output"}
+                  </pre>
+                </div>
+              </>
+            ) : (
+              /* Test Results Display */
+              <div style={{
+                flex: 1,
+                padding: "15px 20px",
+                overflowY: "auto",
               }}>
-                Output:
+                {testResults.map((test, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      marginBottom: "12px",
+                      padding: "12px",
+                      background: test.passed ? "#1a3a1a" : "#3a1a1a",
+                      border: `1px solid ${test.passed ? "#2d5a2d" : "#5a2d2d"}`,
+                      borderRadius: "8px",
+                    }}
+                  >
+                    <div style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      marginBottom: "8px",
+                    }}>
+                      <span style={{
+                        fontSize: "16px",
+                      }}>
+                        {test.passed ? "✅" : "❌"}
+                      </span>
+                      <span style={{
+                        color: test.passed ? "#4CAF50" : "#f44336",
+                        fontWeight: "600",
+                        fontSize: "13px",
+                      }}>
+                        Test Case {idx + 1}
+                      </span>
+                    </div>
+                    
+                    <div style={{ fontSize: "12px", color: "#ccc", marginBottom: "4px" }}>
+                      <strong>Input:</strong> {test.input || "(empty)"}
+                    </div>
+                    
+                    <div style={{ fontSize: "12px", color: "#ccc", marginBottom: "4px" }}>
+                      <strong>Expected:</strong> {test.expectedOutput}
+                    </div>
+                    
+                    <div style={{ fontSize: "12px", color: test.passed ? "#4CAF50" : "#f44336" }}>
+                      <strong>Got:</strong> {test.actualOutput || "(no output)"}
+                    </div>
+                    
+                    {test.stderr && (
+                      <div style={{ fontSize: "11px", color: "#ff9800", marginTop: "4px" }}>
+                        <strong>Error:</strong> {test.stderr}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-              <pre style={{
-                color: "#4CAF50",
-                fontSize: "13px",
-                margin: 0,
-                fontFamily: "monospace",
-                whiteSpace: "pre-wrap",
-              }}>
-                {output || "Click 'Run Code' to see output"}
-              </pre>
-            </div>
+            )}
           </div>
         </div>
       </div>
