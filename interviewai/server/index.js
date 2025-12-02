@@ -159,9 +159,9 @@ app.post("/api/auto-feedback", async (req, res) => {
 
     // ✅ Adjust instructions based on help level
     const helpInstructions = {
-      easy: 'Provide 2-3 sentences with detailed suggestions and explanations. Be very helpful.',
-      medium: 'Provide 1-2 sentences with balanced hints without giving away the solution.',
-      hard: 'Provide EXACTLY 1 sentence with a minimal, subtle hint only.',
+      easy: 'Provide 2-3 sentences with one detailed suggestion/explanation. Be very helpful. If the user does not have much code written or is not on the right track, give them in idea of how to get started.',
+      medium: 'Provide 1-2 sentences with one HINT without giving away the solution.',
+      hard: 'Provide EXACTLY 1 sentence with one extremely minimal, subtle HINT only.',
       off: 'Do not provide feedback.',
     };
 
@@ -179,17 +179,18 @@ ${convoText || 'No previous conversation'}
 
 Help Level: ${instruction}
 
-Provide BRIEF, proactive feedback about:
+Provide BRIEF, proactive feedback about (one of the following):
 - Potential bugs or syntax issues you notice
 - Code quality improvements
 - Logic errors or edge cases they might be missing
 - Better approaches to consider
 
-${helpLevel === 'hard' ? 'Keep your response to EXACTLY 1 sentence.' 
-  : helpLevel === 'medium' ? 'Keep your response to 1-2 sentences maximum.' 
-  : 'Keep your response to 2-3 sentences maximum.'}
+If the user has not written much code yet, give them an idea of how to get started rather than pointingn out errors, bugs or refinements.
+IMPORTANT: DO NOT RESTATE YOURSELF. IF YOU HAVE NOTHING TO SAY, WAIT TIL THE USER TYPES MORE BEFORE COMMENTING AGAIN".
 
-Keep it concise, encouraging, and actionable. Don't rewrite their code.`;
+${helpLevel === 'hard' ? 'Keep your response to EXACTLY 1 sentence and only give ONE HINT at a next step'
+           : helpLevel === 'medium' ? 'Keep your response to 1-2 sentences maximum and don\'t give away the solution, only prividing ONE HINT.'  
+           : 'Keep your response to 2-3 sentences maximum only giving ONE piece of feedback.'}`;
 
     const completion = await groq.chat.completions.create({
       messages: [

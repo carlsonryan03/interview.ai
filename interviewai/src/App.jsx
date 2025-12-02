@@ -26,10 +26,10 @@ if (typeof document !== 'undefined') {
 const getStarterCode = (languageName = "") => {
   const lower = (languageName || "").toLowerCase();
   if (lower.includes("python")) {
-    return "# Type your code here\nimport sys\n\n# Access command line arguments: sys.argv[1], sys.argv[2], etc.\n\ndef solution():\n    pass\n\nif __name__ == \"__main__\":\n    print(solution())\n";
+    return "import sys\n\n# Type your code here\ndef solution():\n    pass\n\nif __name__ == \"__main__\":\n    print(solution())\n";
   }
   if (lower.includes("javascript") || lower.includes("node")) {
-    return "// Type your code here\n// Access command line arguments: process.argv[2], process.argv[3], etc.\n\nfunction solution() {\n  // TODO\n}\n\nconsole.log(solution());\n";
+    return "// Type your code here\nfunction solution() {\n  // TODO\n}\n\nconsole.log(solution());\n";
   }
   return "// Type your code here\n";
 };
@@ -443,7 +443,7 @@ export default function App() {
       } finally {
         setLoadingAutoFeedback(false);
       }
-    }, 3000);
+    }, 7000);
 
     return () => clearTimeout(timer);
   }, [code, helpLevel, language?.name, lastAnalyzedCode, lastAutoFeedback]);
