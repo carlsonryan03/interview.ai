@@ -22,22 +22,207 @@ if (typeof document !== 'undefined') {
   document.head.appendChild(styleSheet);
 }
 
+// choose the correct line comment symbol based on language name
+function getLineCommentSymbol(name = "") {
+  const lower = name.toLowerCase();
+
+  if (!name) return "//";
+
+  // Shell-like
+  if (
+    lower.includes("bash") ||
+    lower.includes("shell") ||
+    lower.includes("sh")
+  ) return "#";
+
+  // Python / Ruby / R / YAML-ish
+  if (
+    lower.includes("python") ||
+    lower.includes("ruby") ||
+    lower === "r" ||
+    lower.includes("r ")
+  ) return "#";
+
+  // Lua, SQL, Haskell
+  if (
+    lower.includes("lua") ||
+    lower.includes("sql") ||
+    lower.includes("haskell")
+  ) return "--";
+
+  // Assembly (NASM, MASM, GAS)
+  if (lower.includes("asm") || lower.includes("assembly") || lower.includes("nasm"))
+    return ";";
+
+  // Fortran
+  if (lower.includes("fortran")) return "!";
+
+  // Pascal
+  if (lower.includes("pascal")) return "//"; // FPC accepts // as line comment
+
+  // Visual Basic / VB.NET
+  if (lower.includes("vb") || lower.includes("visual basic"))
+    return "'";
+
+  // Lisp family
+  if (lower.includes("lisp") || lower.includes("clojure"))
+    return ";;";
+
+  // Prolog
+  if (lower.includes("prolog"))
+    return "%";
+
+  // COBOL
+  if (lower.includes("cobol"))
+    return "*";  // standard line comment column
+
+  // D language
+  if (lower === "d " || lower.includes("d ("))
+    return "//";
+
+  // Elixir / Erlang
+  if (lower.includes("elixir") || lower.includes("erlang"))
+    return "#";
+
+  // F#
+  if (lower.startsWith("f#"))
+    return "//";
+
+  // MATLAB / Octave
+  if (lower.includes("octave"))
+    return "%";
+
+  // Objective-C = C-style
+  if (lower.includes("objective-c"))
+    return "//";
+
+  // Groovy / Scala / Kotlin / Swift / Dart → C-style
+  if (
+    lower.includes("groovy") ||
+    lower.includes("scala") ||
+    lower.includes("kotlin") ||
+    lower.includes("swift") ||
+    lower.includes("dart")
+  ) return "//";
+
+  // Basic (FreeBASIC)
+  if (lower.includes("basic") || lower.includes("fbc"))
+    return "'";
+
+  // Plaintext
+  if (lower.includes("plain text"))
+    return "";
+
+  // Default to C-style
+  return "//";
+}
+
 // Starter code templates
 const getStarterCode = (languageName = "") => {
   const lower = (languageName || "").toLowerCase();
+  const c = getLineCommentSymbol(lower);
+  const comment = (txt) => `${c} ${txt}\n`;
+
   if (lower.includes("python")) {
-    return "import sys\n\n# Type your code here\ndef solution():\n    pass\n\nif __name__ == \"__main__\":\n    print(solution())\n";
+    return "# Type your code here\n\ndef solution():\n    pass\n\nif __name__ == \"__main__\":\n    print(solution())\n";
   }
   if (lower.includes("javascript") || lower.includes("node")) {
-    return "// Type your code here\nfunction solution() {\n  // TODO\n}\n\nconsole.log(solution());\n";
+    return `${comment("Type your code here")}\nfunction solution() {\n  // TODO\n}\n\nconsole.log(solution());\n`;
   }
-  return "// Type your code here\n";
-};
+  if (lower.includes("typescript")) {
+    return `${comment("Type your code here")}\nfunction solution(): any {\n  // TODO\n}\n\nconsole.log(solution());\n`;
+  }
+  if (lower.includes("java")) {
+    return `${comment("Type your code here")}\npublic class Main {\n  public static void main(String[] args) {\n    System.out.println(\"Hello\");\n  }\n}\n`;
+  }
+  if (lower.includes("c++") || lower.includes("cpp")) {
+    return `${comment("Type your code here")}\n#include <iostream>\nusing namespace std;\n\nint main() {\n  cout << \"Hello\" << endl;\n  return 0;\n}\n`;
+  }
+  if (lower.match(/\bc\b/) && !lower.includes("objc")) {
+    return `${comment("Type your code here")}\n#include <stdio.h>\nint main(){\n  puts(\"Hello\");\n  return 0;\n}\n`;
+  }
+  if (lower.includes("c#")) {
+    return `${comment("Type your code here")}\nusing System;\nclass Program { static void Main(){ Console.WriteLine(\"Hello\"); } }\n`;
+  }
+  if (lower.includes("go")) {
+    return `${comment("Type your code here")}\npackage main\nimport \"fmt\"\nfunc main(){ fmt.Println(\"Hello\") }\n`;
+  }
+  if (lower.includes("rust")) {
+    return `${comment("Type your code here")}\nfn main(){ println!(\"Hello\"); }\n`;
+  }
+  if (lower.includes("php")) {
+    return `<?php\n${comment("Type your code here")}\nfunction solution(){\n  // TODO\n}\n\necho \"Hello\\n\";\n`;
+  }
+  if (lower.includes("ruby")) {
+    return `# Type your code here\nputs 'Hello'\n`;
+  }
+  if (lower.includes("bash") || lower.includes("shell")) {
+    return `# Type your code here\n\necho \"Hello\"\n`;
+  }
+  if (lower.includes("sql")) {
+    return `-- Type your SQL query here\nSELECT 1;\n`;
+  }
+  if (lower.includes("swift")) {
+    return `${comment("Type your code here")}\nprint(\"Hello\")\n`;
+  }
+  if (lower.includes("kotlin")) {
+    return `${comment("Type your code here")}\nfun main(){ println(\"Hello\") }\n`;
+  }
+  if (lower.includes("lua")) {
+    return `-- Type your code here\nprint('Hello')\n`;
+  }
+  if (lower.includes("r ")) {
+    return `# Type your code here\nprint(1)\n`;
+  }
+  if (lower.includes("perl")) {
+    return `# Type your code here\nprint \"Hello\\n\";\n`;
+  }
+  if (lower.includes("haskell")) {
+    return `-- Type your code here\nmain = putStrLn \"Hello\"\n`;
+  }
+  if (lower.includes("scala")) {
+    return `${comment("Type your code here")}\nobject Main extends App { println(\"Hello\") }\n`;
+  }
+  if (lower.includes("dart")) {
+    return `${comment("Type your code here")}\nvoid main(){ print('Hello'); }\n`;
+  }
+  if (lower.includes("clojure") || lower.includes("lisp")) {
+    return `;; Type your code here\n(println "Hello")\n`;
+  }
+  if (lower.includes("fortran")) {
+    return `${comment("Type your code here")}\nprogram main\n  print *, 'Hello'\nend program main\n`;
+  }
+  // Fall back: simple comment + placeholder
+  return `${comment("Type your code here")}\n`;
+}
 
 function mapToMonaco(name = "") {
   const lower = (name || "").toLowerCase();
   if (lower.includes("python")) return "python";
-  if (lower.includes("javascript")) return "javascript";
+  if (lower.includes("javascript") || lower.includes("node")) return "javascript";
+  if (lower.includes("typescript")) return "typescript";
+  if (lower.includes("java")) return "java";
+  if (lower.includes("c++") || lower.includes("cpp")) return "cpp";
+  if (lower.match(/\bc\b/) && !lower.includes("objc")) return "c";
+  if (lower.includes("c#") || lower.includes("csharp")) return "csharp";
+  if (lower.includes("go")) return "go";
+  if (lower.includes("rust")) return "rust";
+  if (lower.includes("ruby")) return "ruby";
+  if (lower.includes("php")) return "php";
+  if (lower.includes("swift")) return "swift";
+  if (lower.includes("kotlin")) return "kotlin";
+  if (lower.includes("lua")) return "lua";
+  if (lower.includes("r ") || lower === "r") return "r";
+  if (lower.includes("sql")) return "sql";
+  if (lower.includes("perl")) return "perl";
+  if (lower.includes("haskell")) return "haskell";
+  if (lower.includes("scala")) return "scala";
+  if (lower.includes("dart")) return "dart";
+  if (lower.includes("elixir")) return "elixir";
+  if (lower.includes("erlang")) return "erlang";
+  if (lower.includes("groovy")) return "groovy";
+  if (lower.includes("ocaml")) return "ocaml";
+  // Editor doesn't support every niche language — fallback to plaintext
   return "plaintext";
 }
 
