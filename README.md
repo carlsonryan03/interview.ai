@@ -26,6 +26,8 @@ Create another `.env` file in the `interview.ai/interviewai/server` directory. G
     JWT_SECRET=your_jwt_secret
 ```
 
+## Installations
+
 Our project uses node.js, which can be installed at https://nodejs.org/en/download or by running this code:
 
 For **Windows** with chocolatey:
@@ -49,6 +51,8 @@ Next, install the required npm libraries:
 
     npm install bcryptjs jsonwebtoken sqlite3
     npm install dotenv
+
+## Running
 
 **Run the backend:**
 
