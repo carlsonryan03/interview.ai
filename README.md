@@ -1,3 +1,6 @@
+# Description
+Interview.ai is a fully vibe-coded node.js application created for the Colorado School of Mines Full-Stack LLMs course. This application utilizes a groq-based chat system to prompt users with coding interview questions of varying topics and difficulty and can compile/run any Judge0 supported language, including python, c, c++, java, javascript, go, r, bash, haskell, lisp, and many more. It must (currently) be run locally with the instructions below. 
+
 # Run instructions
 
 Our project uses node.js, which can be installed at https://nodejs.org/en/download or by running this code:
