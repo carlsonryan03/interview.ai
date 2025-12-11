@@ -3,6 +3,29 @@ Interview.ai is a fully vibe-coded node.js application created for the Colorado 
 
 # Run instructions
 
+## Get API keys
+Navigate here to setup a Judge0 API key: https://rapidapi.com/judge0-official/api/judge0-ce/pricing
+
+Navigate here to setup a groq API key: https://console.groq.com/keys
+
+## Environment setup
+Create a `.env` file in the `interview.ai/interviewai` directory. Give it the following structure:
+```
+    VITE_JUDGE0_URL=https://api.judge0.com
+    JUDGE0_KEY=your_judge0_api_key
+```
+
+Create another `.env` file in the `interview.ai/interviewai/server` directory. Give it the following structure:
+*Note: JWT_secret is a passphrase you set to protect your local user database. This can be set to any passphrase you want. Do not share it with others.*
+```
+    PORT=3001
+    JUDGE0_URL=https://judge0-ce.p.rapidapi.com/
+    JUDGE0_KEY=your_judge0_api_key
+    JUDGE0_RAPIDAPI_HOST=judge0-ce.p.rapidapi.com
+    GROQ_API_KEY=your_groq_api_key
+    JWT_SECRET=your_jwt_secret
+```
+
 Our project uses node.js, which can be installed at https://nodejs.org/en/download or by running this code:
 
 For **Windows** with chocolatey:
