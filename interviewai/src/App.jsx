@@ -241,7 +241,7 @@ function decodeBase64Safe(str) {
 }
 
 // Dashboard Component
-function Dashboard({ onStartInterview, stats, onViewHistory }) {
+function Dashboard({ onStartInterview, user}) {
   return (
     <div style={{
       minHeight: "100vh",
@@ -281,39 +281,16 @@ function Dashboard({ onStartInterview, stats, onViewHistory }) {
           }}>
             Practice coding interviews with AI-powered feedback and real-time assistance
           </p>
-        </div>
-
-        {/* Stats Cards */}
-        <div style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
-          gap: "20px",
-          marginBottom: "40px",
-        }}>
-          <StatCard 
-            icon="🎯"
-            title="Problems Solved"
-            value={0}
-            color="#4CAF50"
-          />
-          <StatCard 
-            icon="⏱️"
-            title="Total Time"
-            value={formatTime(0)}
-            color="#2196F3"
-          />
-          <StatCard 
-            icon="✅"
-            title="Tests Passed"
-            value={`${0}/${0}`}
-            color="#FF9800"
-          />
-          <StatCard 
-            icon="🔥"
-            title="Current Streak"
-            value={`${0} days`}
-            color="#f44336"
-          />
+          <h1 style={{
+            fontSize: "56px",
+            fontWeight: "800",
+            color: "white",
+            margin: "0 0 20px 0",
+            textShadow: "0 4px 6px rgba(0,0,0,0.2)",
+            letterSpacing: "-0.02em",
+          }}>
+            Welcome, {user?.username}!
+          </h1>
         </div>
 
         {/* Action Buttons */}
@@ -349,29 +326,6 @@ function Dashboard({ onStartInterview, stats, onViewHistory }) {
             Start New Interview
           </button>
           
-          <button
-            onClick={onViewHistory}
-            style={{
-              padding: "20px 40px",
-              fontSize: "18px",
-              fontWeight: "600",
-              background: "rgba(255,255,255,0.2)",
-              color: "white",
-              border: "2px solid white",
-              borderRadius: "12px",
-              cursor: "pointer",
-              backdropFilter: "blur(10px)",
-              transition: "all 0.3s ease",
-            }}
-            onMouseOver={(e) => {
-              e.target.style.background = "rgba(255,255,255,0.3)";
-            }}
-            onMouseOut={(e) => {
-              e.target.style.background = "rgba(255,255,255,0.2)";
-            }}
-          >
-            📊 View History
-          </button>
         </div>
 
         {/* Feature Cards */}
@@ -588,7 +542,7 @@ export default function App() {
 
   // Auto-feedback when user stops typing
   useEffect(() => {
-    console.log("🔍 Auto-feedback check - Help Level:", helpLevel);
+    console.log("Auto-feedback check - Help Level:", helpLevel);
 
     if (helpLevel === "off" || !code || code.trim().length < 20 || messages.length === 0) {
       return;
@@ -793,7 +747,7 @@ if (!user) {
       <Dashboard 
         onStartInterview={() => setShowDashboard(false)}
         stats={stats}
-        onViewHistory={() => alert("History feature coming soon!")}
+        user={user}
       />
     );
   }

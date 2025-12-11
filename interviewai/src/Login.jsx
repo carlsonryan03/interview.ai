@@ -130,7 +130,7 @@ export default function Login({ onLoginSuccess }) {
                   fontSize: "14px",
                 }}
               >
-                Username
+                username
               </label>
               <input
                 type="text"
