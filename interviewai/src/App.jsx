@@ -494,8 +494,11 @@ export default function App() {
         decodeBase64Safe(result?.stderr)?.trim() ||
         result?.message ||
         "";
-
-      setOutput(outputText);
+      if (!outputText && result.status?.id === 3) {
+        setOutput("Code ran without output");
+      } else {
+        setOutput(outputText);
+      }
     } catch (err) {
       setOutput("Error: " + err.message);
     } finally {
