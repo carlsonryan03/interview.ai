@@ -3,6 +3,8 @@ Interview.ai is a fully vibe-coded node.js application created for the Colorado 
 
 # Run instructions
 
+If you have already configured the `.env` files, skip to the installations step.
+
 ## Get API keys
 Navigate here to setup a Judge0 API key: https://rapidapi.com/judge0-official/api/judge0-ce/pricing
 
