@@ -32,7 +32,7 @@ Create another `.env` file in the `interview.ai/interviewai/server` directory. G
 
 Our project uses node.js, which can be installed for your OS at https://nodejs.org/en/download (**RECOMMENDED**) or by running this code:
 
-For **Windows** with chocolatey:
+For **Windows** with chocolatey (first line is to download chocolatey, skip if already downloaded):
 ```
     powershell -c "irm https://community.chocolatey.org/install.ps1|iex"
     choco install nodejs --version="24.12.0"
@@ -51,24 +51,27 @@ For **MacOS** and **Linux** with nvm:
 
 Next, install the required npm libraries:
 
-    npm install bcryptjs jsonwebtoken sqlite3
-    npm install dotenv
+    npm install bcryptjs jsonwebtoken sqlite3 
+    npm install dotenv express
 
 ## Running
+
+**Run the frontend:**
+
+Open a new terminal and navigate to `interview.ai/interviewai` and run the frontend:
+
+    npm install
+    cd interview.ai/interviewai
+    npm run dev
 
 **Run the backend:**
 
 Open a terminal and navigate to `interview.ai/interviewai/server` and run the backend:
 
+    npm install
     cd interview.ai/interviewai/server
     npm run dev
 
-**Run the frontend:**
-
-Open a new terminal and nagivate to `interview.ai/interviewai/src` and run the frontend:
-
-    cd interview.ai/interviewai/src
-    npm run dev
 
 **Go to the website:**
 
