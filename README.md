@@ -30,7 +30,7 @@ Create another `.env` file in the `interview.ai/interviewai/server` directory. G
 
 ## Installations
 
-Our project uses node.js, which can be installed at https://nodejs.org/en/download or by running this code:
+Our project uses node.js, which can be installed for your OS at https://nodejs.org/en/download (**RECOMMENDED**) or by running this code:
 
 For **Windows** with chocolatey:
 ```
